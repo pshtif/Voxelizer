@@ -1,0 +1,21 @@
+﻿/*
+ *	Created by:  Peter @sHTiF Stefcek
+ */
+
+#pragma kernel CSMain
+
+float4x4 _cullingMatrix;
+float _cullingDistance;
+uint _batchOffset;
+StructuredBuffer<float4x4> _matrixBuffer; 
+AppendStructuredBuffer<uint> _visibilityBuffer;
+
+[numthreads(64,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float4x4 matrixWS = _matrixBuffer[id.x + _batchOffset];
+	float4 absPosCS = abs(mul(_cullingMatrix,float4(matrixWS._m03_m13_m23,1.0)));
+    
+    if (absPosCS.z <= absPosCS.w && absPosCS.y <= absPosCS.w && absPosCS.x <= absPosCS.w && absPosCS.w <= _cullingDistance)
+	    _visibilityBuffer.Append(id.x + _batchOffset);
+}

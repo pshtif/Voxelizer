@@ -1,0 +1,18 @@
+{
+    "name": "Voxelizer.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:315e261dc1f9bed4da090d0bdc1b1f9b"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
