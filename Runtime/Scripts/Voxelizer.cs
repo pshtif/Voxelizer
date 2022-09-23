@@ -134,7 +134,7 @@ namespace BinaryEgo.Voxelizer
                         outputFilter = go.AddComponent<MeshFilter>();
                     }
                     
-                    outputFilter.sharedMesh = DMeshUtils.DMeshToUnityMesh(outputMesh, false);
+                    outputFilter.sharedMesh = DMeshUtils.DMeshToUnityMesh(outputMesh);
                 }
             }
         }
