@@ -1,0 +1,24 @@
+{
+  "name": "com.binaryego.voxelizer",
+  "displayName": "Voxelizer",
+  "version": "0.1.0",
+  "unity": "2021.3",
+  "description": "Voxelizer tool for editor and runtime voxelization.",
+  "author": {
+	"name": "Peter @sHTiF Stefcek",
+	"email": "pshtif@gmail.com"
+  },
+  "documentationUrl": "https://github.com/pshtif/Voxelizer",
+  "changelogUrl": "https://github.com/pshtif/Voxelizer/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/pshtif/Voxelizer/blob/main/LICENSE.md",
+  "keywords": [ 
+	"package",
+	"unity",
+	"gpu",
+    "voxel",
+	"editor"
+  ],
+  "dependencies": {
+    "com.unity.collections": "1.2.4"
+  }
+}
