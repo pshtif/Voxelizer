@@ -10,7 +10,7 @@ namespace BinaryEgo.Voxelizer.Editor
     [CustomEditor(typeof(Voxelizer))]
     public class VoxelizerEditor : UnityEditor.Editor
     {
-        public static GUISkin Skin => (GUISkin)Resources.Load("Skins/InstancePainterSkin");
+        public static GUISkin Skin => (GUISkin)Resources.Load("Skins/VoxelizerEditorSkin");
         
         public override void OnInspectorGUI()
         {
