@@ -88,6 +88,9 @@ public class VoxelRenderer : MonoBehaviour
         
         if (_initialized)
             return;
+        
+        _voxelGroups = new List<VoxelGroup>();
+        _renderBounds = new Bounds();
 
         if (instanceMaterial == null)
             return;
@@ -96,8 +99,6 @@ public class VoxelRenderer : MonoBehaviour
         
         _previousCullingEnabled = useCulling;
         _voxelMesh = CreateCube();
-        _voxelGroups = new List<VoxelGroup>();
-        _renderBounds = new Bounds();
 
         _visibleCells = new NativeList<int>(Allocator.Persistent);
         
@@ -202,6 +203,9 @@ public class VoxelRenderer : MonoBehaviour
 
             isDirty = false;
         }
+
+        if (_voxelGroups == null)
+            return;
 
         int index = 0;
         foreach (VoxelGroup voxelGroup in _voxelGroups)
