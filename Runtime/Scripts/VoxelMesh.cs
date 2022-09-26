@@ -175,6 +175,9 @@ public class VoxelMesh
     
     public void Invalidate(ComputeBuffer p_matrixBuffer, NativeArray<Matrix4x4> p_matrixArray, ComputeBuffer p_colorBuffer, NativeArray<Vector4> p_colorArray, int p_index)
     {
+        if (_transform == null)
+            return;
+        
         //if (!_transform.hasChanged || !IsInitialized)
         //    return;
 
