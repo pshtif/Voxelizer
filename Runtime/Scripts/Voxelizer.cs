@@ -4,7 +4,9 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using g3;
+using UnityEditor;
 using UnityEngine;
 
 namespace BinaryEgo.Voxelizer
@@ -33,12 +35,13 @@ namespace BinaryEgo.Voxelizer
         
         public void Voxelize()
         {
+            OnProgress("Voxelizer", "Voxelization initialized", 0);
+            
             Mesh mesh = sourceRenderer.GetComponent<MeshFilter>().sharedMesh;
             Material[] materials = sourceRenderer.sharedMaterials.ToArray();
 
             DMesh3 dmesh = DMeshUtils.UnityMeshToDMesh(mesh, false);
             
-            //int cellCount = Mathf.CeilToInt((float) (dmesh.CachedBounds.MaxDim / voxelSize));
             int cellCount = voxelDensity;
             float voxelSize;
             switch (voxelDensityType)
@@ -75,15 +78,18 @@ namespace BinaryEgo.Voxelizer
                     {
                         case VoxelizationType.SDF:
                             voxelOffset = -Vector3d.One * voxelSize * 2;
+                            OnProgress("Voxelizer", "Running SDF voxelization.", .2f);
                             bitmap = VoxelizeMeshUsingSDF(dmesh, spatial, indexer, voxelSize, sampleColor, interpolateColorSampling);
                             break;
                         case VoxelizationType.GRID:
                             voxelOffset = Vector3d.One * voxelSize/2;
+                            OnProgress("Voxelizer", "Running Grid voxelization.", .2f);
                             bitmap = VoxelizeMeshUsingGrid(dmesh, voxelSize, spatial, indexer, cellCount, sampleColor,
                                 interpolateColorSampling);
                             break;
                         default:
                             voxelOffset = Vector3d.One * voxelSize/2;
+                            OnProgress("Voxelizer", "Running Winding voxelization.", .2f);
                             bitmap = VoxelizeMeshUsingWinding(dmesh, voxelSize, spatial, indexer, cellCount, sampleColor,
                                 interpolateColorSampling);
                             break;
@@ -108,6 +114,7 @@ namespace BinaryEgo.Voxelizer
                 if (!enableVoxelCache || dmesh.name.IsNullOrWhitespace() || _voxelColorCache == null ||
                     !_voxelColorCache.ContainsKey(dmesh.name))
                 {
+                    OnProgress("Voxelizer", "Generating color buffer.", .6f);
                     color = GenerateColorBuffer(bitmap, voxelOffset, dmesh, indexer, spatial, materials, interpolateColorSampling);
                 }
                 else
@@ -115,12 +122,14 @@ namespace BinaryEgo.Voxelizer
                     color = _voxelColorCache[dmesh.name];
                 }
                 
+                OnProgress("Voxelizer", "Generating voxel mesh.", .7f);
                 var voxelMesh = new VoxelMesh(bitmap, color, sourceRenderer.transform, dmesh.CachedBounds, false, voxelSize, Vector3.zero);
                 VoxelRenderer.Instance.RemoveAllGroups();
                 VoxelRenderer.Instance.Add(voxelMesh);
 
                 if (generateMesh)
                 {
+                    OnProgress("Voxelizer", "Generating triangulized mesh.", .8f);
                     DMesh3 outputMesh = GenerateVoxelMesh(bitmap, voxelSize, voxelOffset, sampleColor, dmesh, indexer,
                         spatial, interpolateColorSampling, materials);
                     MeshTransforms.Translate(outputMesh, new Vector3(
@@ -137,6 +146,8 @@ namespace BinaryEgo.Voxelizer
                     outputFilter.sharedMesh = DMeshUtils.DMeshToUnityMesh(outputMesh);
                 }
             }
+
+            OnComplete();
         }
 
         public DMesh3 GenerateVoxelMesh(Bitmap3 p_bitmap, double p_voxelSize, Vector3d p_voxelOffset,
@@ -244,6 +255,21 @@ namespace BinaryEgo.Voxelizer
             float a3 = (float) (Vector3d.Cross(d1, d2).Length / a);
             
             return p_uv1 * a1 + p_uv2 * a2 + p_uv3 * a3;
+        }
+
+        void OnProgress(string p_title, string p_info, float p_progress)
+        {
+            #if UNITY_EDITOR
+            EditorUtility.DisplayProgressBar(p_title, p_info, p_progress);
+            Thread.Sleep(200);
+            #endif
+        }
+
+        void OnComplete()
+        {
+            #if UNITY_EDITOR
+            EditorUtility.ClearProgressBar();
+            #endif
         }
         
         public static Color GetInterpolatedColorInTriangle(Vector3d p_p1, Vector3d p_p2, Vector3d p_p3, Vector3d p_point, Vector3f p_color1,
