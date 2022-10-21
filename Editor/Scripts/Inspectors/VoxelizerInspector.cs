@@ -8,7 +8,7 @@ using UnityEngine;
 namespace BinaryEgo.Voxelizer.Editor
 {
     [CustomEditor(typeof(Voxelizer))]
-    public class VoxelizerEditor : UnityEditor.Editor
+    public class VoxelizerInspector : UnityEditor.Editor
     {
         public static GUISkin Skin => (GUISkin)Resources.Load("Skins/VoxelizerEditorSkin");
         
@@ -16,17 +16,21 @@ namespace BinaryEgo.Voxelizer.Editor
         {
             var voxelizer = (target as Voxelizer);
             
-            GUILayout.Label("VOXELIZER", Skin.GetStyle("editor_title"));
+            GUILayout.Label("VOXELIZER", Skin.GetStyle("editor_title"), GUILayout.Height(32));
 
             EditorGUI.BeginChangeCheck();
 
             voxelizer.sourceRenderer =
-                (MeshRenderer)EditorGUILayout.ObjectField(voxelizer.sourceRenderer, typeof(MeshRenderer), true);
+                (MeshRenderer)EditorGUILayout.ObjectField("Source Renderer", voxelizer.sourceRenderer,
+                    typeof(MeshRenderer), true);
 
             voxelizer.autoVoxelize = EditorGUILayout.Toggle("Auto Voxelize", voxelizer.autoVoxelize);
 
+            voxelizer.voxelizationType =
+                (VoxelizationType)EditorGUILayout.EnumPopup("Voxelization", voxelizer.voxelizationType);
+
             voxelizer.voxelDensityType = (VoxelDensityType)EditorGUILayout.EnumPopup("Density Type", voxelizer.voxelDensityType);
-            voxelizer.voxelDensity = EditorGUILayout.IntSlider(voxelizer.voxelDensity, 1, 100);
+            voxelizer.voxelDensity = EditorGUILayout.IntSlider("Voxel Density", voxelizer.voxelDensity, 1, 100);
             
             voxelizer.generateMesh = EditorGUILayout.Toggle("Generate Unity Mesh", voxelizer.generateMesh);
 
