@@ -7,46 +7,68 @@ using UnityEngine;
 
 namespace BinaryEgo.Voxelizer.Editor
 {
-    [CustomEditor(typeof(Voxelizer))]
-    public class VoxelizerInspector : UnityEditor.Editor
+    [CustomEditor(typeof(VoxelRenderer))]
+    public class VoxelRendererInspector : UnityEditor.Editor
     {
         public static GUISkin Skin => (GUISkin)Resources.Load("Skins/VoxelizerEditorSkin");
         
         public override void OnInspectorGUI()
         {
-            var voxelizer = (target as Voxelizer);
+            var voxelRenderer = (target as VoxelRenderer);
             
-            GUILayout.Label("VOXELIZER", Skin.GetStyle("editor_title"), GUILayout.Height(32));
+            GUILayout.Label("VOXEL RENDERER", Skin.GetStyle("editor_title"), GUILayout.Height(32));
 
             EditorGUI.BeginChangeCheck();
 
-            voxelizer.sourceRenderer =
-                (MeshRenderer)EditorGUILayout.ObjectField("Source Renderer", voxelizer.sourceRenderer,
-                    typeof(MeshRenderer), true);
+            voxelRenderer.voxelMeshType =
+                (VoxelMeshType)EditorGUILayout.EnumPopup("Voxel Mesh Type", voxelRenderer.voxelMeshType);
 
-            voxelizer.autoVoxelize = EditorGUILayout.Toggle("Auto Voxelize", voxelizer.autoVoxelize);
-
-            voxelizer.voxelizationType =
-                (VoxelizationType)EditorGUILayout.EnumPopup("Voxelization", voxelizer.voxelizationType);
-
-            voxelizer.voxelDensityType = (VoxelDensityType)EditorGUILayout.EnumPopup("Density Type", voxelizer.voxelDensityType);
-            voxelizer.voxelDensity = EditorGUILayout.IntSlider("Voxel Density", voxelizer.voxelDensity, 1, 100);
-            
-            voxelizer.generateMesh = EditorGUILayout.Toggle("Generate Unity Mesh", voxelizer.generateMesh);
-
-            if (EditorGUI.EndChangeCheck())
+            if (voxelRenderer.voxelMeshType == VoxelMeshType.CUSTOM)
             {
-                if (voxelizer.autoVoxelize)
-                {
-                    voxelizer.Voxelize();
-                    SceneView.lastActiveSceneView?.Repaint();
-                }
+                voxelRenderer.customVoxelMesh =
+                    (Mesh)EditorGUILayout.ObjectField(new GUIContent("Voxel Mesh"), voxelRenderer.customVoxelMesh,
+                        typeof(Mesh), false);
             }
             
-            if (GUILayout.Button("Voxelize", GUILayout.Height(32)))
+            voxelRenderer.voxelMaterial =
+                (Material)EditorGUILayout.ObjectField(new GUIContent("Voxel Material"), voxelRenderer.voxelMaterial,
+                    typeof(Material), false);
+
+            voxelRenderer.enableCulling = EditorGUILayout.Toggle("Enable Culling", voxelRenderer.enableCulling);
+
+            if (voxelRenderer.enableCulling)
             {
-                voxelizer.Voxelize();
+                voxelRenderer.cullingDistance =
+                    EditorGUILayout.FloatField("Culling Distance", voxelRenderer.cullingDistance);
+                voxelRenderer.cullingShader = (ComputeShader)EditorGUILayout.ObjectField(
+                    new GUIContent("Culling Shader"),
+                    voxelRenderer.cullingShader, typeof(ComputeShader), false);
             }
+            
+            
+            // voxelizer.autoVoxelize = EditorGUILayout.Toggle("Auto Voxelize", voxelizer.autoVoxelize);
+            //
+            // voxelizer.voxelizationType =
+            //     (VoxelizationType)EditorGUILayout.EnumPopup("Voxelization", voxelizer.voxelizationType);
+            //
+            // voxelizer.voxelDensityType = (VoxelDensityType)EditorGUILayout.EnumPopup("Density Type", voxelizer.voxelDensityType);
+            // voxelizer.voxelDensity = EditorGUILayout.IntSlider("Voxel Density", voxelizer.voxelDensity, 1, 100);
+            //
+            // voxelizer.generateMesh = EditorGUILayout.Toggle("Generate Unity Mesh", voxelizer.generateMesh);
+            //
+            // if (EditorGUI.EndChangeCheck())
+            // {
+            //     if (voxelizer.autoVoxelize)
+            //     {
+            //         voxelizer.Voxelize();
+            //         SceneView.lastActiveSceneView?.Repaint();
+            //     }
+            // }
+            //
+            // if (GUILayout.Button("Voxelize", GUILayout.Height(32)))
+            // {
+            //     voxelizer.Voxelize();
+            // }
         }
     }
 }
