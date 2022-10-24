@@ -8,17 +8,22 @@ using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
+public enum VoxelMeshType
+{
+    CUBE,
+    QUAD,
+    CUSTOM
+}
+
 [ExecuteInEditMode]
 public class VoxelRenderer : MonoBehaviour
 {
     static public VoxelRenderer Instance { get; private set; }
     static public int voxelCount { get; private set; }
     static public bool isDirty = false;
-
-    //public MeshFilter voxelPrefab;
-    public Material instanceMaterial;
     
-    public float drawDistance = 12;
+    public Material voxelMaterial;
+    public float cullingDistance = 12;
     public ComputeShader cullingShader;
     bool shouldBatchDispatch = true;
     
@@ -39,7 +44,7 @@ public class VoxelRenderer : MonoBehaviour
     private List<Matrix4x4>[] cellMatrices;
     private NativeList<int> _visibleCells;
     
-    public bool useCulling;
+    public bool enableCulling;
 
     [NonSerialized]
     private bool _initialized = false;
@@ -48,12 +53,12 @@ public class VoxelRenderer : MonoBehaviour
     {
         get
         {
-            return useCulling;
+            return enableCulling;
         }
 
         set
         {
-            useCulling = value;
+            enableCulling = value;
         }
     }
 
@@ -61,8 +66,6 @@ public class VoxelRenderer : MonoBehaviour
 
     private NativeArray<Matrix4x4> _matrixArray;
     private NativeArray<Vector4> _colorArray;
-    public NativeArray<Matrix4x4> MatrixArray => _matrixArray;
-
     private NativeArray<Matrix4x4> _zeroMatrixArray;
     private List<VoxelGroup> _voxelGroups;
 
@@ -76,6 +79,10 @@ public class VoxelRenderer : MonoBehaviour
     private Bounds _renderBounds;
     private Mesh _voxelMesh;
     private bool _previousCullingEnabled;
+
+    public VoxelMeshType voxelMeshType = VoxelMeshType.CUBE;
+    private VoxelMeshType _previousVoxelMeshType = VoxelMeshType.CUBE;
+    public Mesh customVoxelMesh;
 
     void Awake()
     {
@@ -92,18 +99,20 @@ public class VoxelRenderer : MonoBehaviour
         _voxelGroups = new List<VoxelGroup>();
         _renderBounds = new Bounds();
 
-        if (instanceMaterial == null)
+        if (voxelMaterial == null)
             return;
 
         Application.targetFrameRate = 60;
         
-        _previousCullingEnabled = useCulling;
-        _voxelMesh = CreateCube();
+        _previousCullingEnabled = enableCulling;
+
+        if (!InitializeVoxelMesh()) 
+            return;
 
         _visibleCells = new NativeList<int>(Allocator.Persistent);
         
-        instanceMaterial.SetVector("_PivotPosWS", transform.position);
-        instanceMaterial.SetVector("_BoundSize", new Vector2(transform.localScale.x, transform.localScale.z));
+        voxelMaterial.SetVector("_PivotPosWS", transform.position);
+        voxelMaterial.SetVector("_BoundSize", new Vector2(transform.localScale.x, transform.localScale.z));
         
         _zeroMatrixArray = new NativeArray<Matrix4x4>(voxelCacheSize, Allocator.Persistent); 
         _matrixArray = new NativeArray<Matrix4x4>(voxelCacheSize, Allocator.Persistent);
@@ -127,21 +136,15 @@ public class VoxelRenderer : MonoBehaviour
         _visibleIdBuffer?.Release();
         _visibleIdBuffer = new ComputeBuffer(voxelCacheSize, sizeof(uint), ComputeBufferType.Append);
         
-        instanceMaterial.SetBuffer("_colorBuffer", _colorBuffer);
-        instanceMaterial.SetBuffer("_matrixBuffer", _matrixBuffer);
-        instanceMaterial.SetBuffer("_visibleIdBuffer", _visibleIdBuffer);
+        voxelMaterial.SetBuffer("_colorBuffer", _colorBuffer);
+        voxelMaterial.SetBuffer("_matrixBuffer", _matrixBuffer);
+        voxelMaterial.SetBuffer("_visibleIdBuffer", _visibleIdBuffer);
         
         _voxelIndirectBuffer?.Release();
         _indirectArgs = new uint[5] { 0, 0, 0, 0, 0 };
         _voxelIndirectBuffer = new ComputeBuffer(1, _indirectArgs.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
         
-        _indirectArgs[0] = (uint)_voxelMesh.GetIndexCount(0);
-        _indirectArgs[1] = (uint)voxelCacheSize;
-        _indirectArgs[2] = (uint)_voxelMesh.GetIndexStart(0);
-        _indirectArgs[3] = (uint)_voxelMesh.GetBaseVertex(0);
-        _indirectArgs[4] = 0;
-
-        _voxelIndirectBuffer.SetData(_indirectArgs);
+        UpdateIndirectMeshBuffer();
 
         if (cullingShader != null)
         {
@@ -150,6 +153,37 @@ public class VoxelRenderer : MonoBehaviour
         }
         
         _initialized = true;
+    }
+
+    private bool InitializeVoxelMesh()
+    {
+        switch (voxelMeshType)
+        {
+            case VoxelMeshType.CUBE:
+                _voxelMesh = CreateCube();
+                break;
+            case VoxelMeshType.QUAD:
+                _voxelMesh = CreateQuad();
+                break;
+            case VoxelMeshType.CUSTOM:
+                _voxelMesh = customVoxelMesh;
+                break;
+        }
+        
+        _previousVoxelMeshType = voxelMeshType;
+
+        return _voxelMesh != null;
+    }
+
+    private void UpdateIndirectMeshBuffer()
+    {
+        _indirectArgs[0] = (uint)_voxelMesh.GetIndexCount(0);
+        _indirectArgs[1] = (uint)voxelCacheSize;
+        _indirectArgs[2] = (uint)_voxelMesh.GetIndexStart(0);
+        _indirectArgs[3] = (uint)_voxelMesh.GetBaseVertex(0);
+        _indirectArgs[4] = 0;
+
+        _voxelIndirectBuffer.SetData(_indirectArgs);
     }
 
     private AsyncGPUReadbackRequest asyncRequest;
@@ -169,6 +203,14 @@ public class VoxelRenderer : MonoBehaviour
 #if UNITY_EDITOR
         if (!Application.isPlaying)
             return;
+
+        if (_initialized && ((voxelMeshType == VoxelMeshType.CUSTOM && _voxelMesh != customVoxelMesh) || voxelMeshType != _previousVoxelMeshType))
+        {
+            if (InitializeVoxelMesh())
+            {
+                UpdateIndirectMeshBuffer();
+            }
+        }
 #endif
         Render();
     }
@@ -184,19 +226,19 @@ public class VoxelRenderer : MonoBehaviour
         //     Debug.Log(String.Join(",", a));
         // }
         
-        if (isDirty || useCulling != _previousCullingEnabled)
+        if (isDirty || enableCulling != _previousCullingEnabled)
         {
-            if (useCulling != _previousCullingEnabled)
+            if (enableCulling != _previousCullingEnabled)
             {
-                _previousCullingEnabled = useCulling;
-                if (!useCulling)
+                _previousCullingEnabled = enableCulling;
+                if (!enableCulling)
                 {
                     _matrixBuffer.SetData(_matrixArray);
                     _colorBuffer.SetData(_colorArray);
                 }
             }
 
-            if (useCulling && useCells)
+            if (enableCulling && useCells)
             {
                 CellInvalidation();
             }
@@ -216,9 +258,9 @@ public class VoxelRenderer : MonoBehaviour
         if (index == 0)
             return;
 
-        if (useCulling)
+        if (enableCulling)
         {
-            instanceMaterial.EnableKeyword("CULLING");
+            voxelMaterial.EnableKeyword("CULLING");
             CellCulling();
             VoxelGPUCulling();
             ComputeBuffer.CopyCount(_visibleIdBuffer, _voxelIndirectBuffer, 4);
@@ -228,7 +270,7 @@ public class VoxelRenderer : MonoBehaviour
         }
         else
         {
-            instanceMaterial.DisableKeyword("CULLING");
+            voxelMaterial.DisableKeyword("CULLING");
             _indirectArgs[1] = (uint)index;
             _voxelIndirectBuffer.SetData(_indirectArgs);
         }
@@ -236,7 +278,7 @@ public class VoxelRenderer : MonoBehaviour
         voxelCount = index;
         _renderBounds.SetMinMax(new Vector3(minX, -5, minZ), new Vector3(maxX, 5, maxZ));
 
-        Graphics.DrawMeshInstancedIndirect(_voxelMesh, 0, instanceMaterial, _renderBounds, _voxelIndirectBuffer, 0, null,
+        Graphics.DrawMeshInstancedIndirect(_voxelMesh, 0, voxelMaterial, _renderBounds, _voxelIndirectBuffer, 0, null,
             ShadowCastingMode.On, true, 0, p_camera);
     }
     
@@ -293,7 +335,7 @@ public class VoxelRenderer : MonoBehaviour
         Camera cam = Camera.main;
         
         float cameraOriginalFarPlane = cam.farClipPlane;
-        cam.farClipPlane = drawDistance;
+        cam.farClipPlane = cullingDistance;
         GeometryUtility.CalculateFrustumPlanes(cam, cameraFrustumPlanes);
         cam.farClipPlane = cameraOriginalFarPlane;
 
@@ -319,16 +361,14 @@ public class VoxelRenderer : MonoBehaviour
         Matrix4x4 vp = p * v;
         
         _visibleIdBuffer.SetCounterValue(0);
-
-        //set once only
+        
         cullingShader.SetMatrix("_cullingMatrix", vp);
-        cullingShader.SetFloat("_cullingDistance", drawDistance);
+        cullingShader.SetFloat("_cullingDistance", cullingDistance);
         
         float threadCount = 64;
         float batchLimit = 65535 * threadCount;
         if (useCells) 
         {
-            //dispatch per visible cell
             var dispatchCount = 0;
             for (int i = 0; i < _visibleCells.Length; i++)
             {
@@ -340,17 +380,13 @@ public class VoxelRenderer : MonoBehaviour
                 }
                 
                 int batchSize = cellMatrices[targetCellFlattenID].Count;
-                 
-                if (shouldBatchDispatch)
+                
+                while (i < _visibleCells.Length - 1 && _visibleCells[i + 1] == _visibleCells[i] + 1)
                 {
-                    while (i < _visibleCells.Length - 1 && _visibleCells[i + 1] == _visibleCells[i] + 1)
-                    {
-                        batchSize += cellMatrices[_visibleCells[i + 1]].Count;
-                        i++;
-                    }
+                    batchSize += cellMatrices[_visibleCells[i + 1]].Count;
+                    i++;
                 }
                 
-                // We can have large batches so need to break up
                 if (batchSize < batchLimit)
                 {
                     cullingShader.SetInt("_batchOffset", memoryOffset);
@@ -363,7 +399,6 @@ public class VoxelRenderer : MonoBehaviour
                     for (int k = 0; k < subBatchCount; k++)
                     {
                         cullingShader.SetInt("_batchOffset", memoryOffset + k * (int)batchLimit);
-                        //float batchCount = (k * batchLimit > batchSize) ? batchSize - (k - 1) * batchLimit : batchLimit;
                         float current = (batchSize < (k + 1) * (int)batchLimit)
                             ? batchSize - k * (int)batchLimit
                             : batchLimit;
@@ -506,6 +541,45 @@ public class VoxelRenderer : MonoBehaviour
         mesh.vertices = vertices;
         mesh.triangles = triangles;
         mesh.normals = normals;
+        mesh.Optimize();
+
+        return mesh;
+    }
+    
+    public static Mesh CreateQuad()
+    {
+        Vector3[] vertices = {
+            new Vector3 (-0.5f, -0.5f, 0f),
+            new Vector3 (0.5f, -0.5f, 0f),
+            new Vector3 (-0.5f, 0.5f, 0f),
+            new Vector3 (0.5f, 0.5f, 0f),
+        };
+
+        int[] triangles = {
+            0, 2, 1, // front
+            1, 2, 3,
+        };
+        
+        Vector3[] normals  = {
+            new Vector3 (0, 0, 1),
+            new Vector3 (0, 0, 1),
+            new Vector3 (0, 0, 1),
+            new Vector3 (0, 0, 1),
+        };
+
+        Vector2[] uvs =
+        {
+            new Vector2(0, 0),
+            new Vector2(1, 0),
+            new Vector2(0, 1),
+            new Vector2(1, 1)
+        };
+
+        Mesh mesh = new Mesh();
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.normals = normals;
+        mesh.uv = uvs;
         mesh.Optimize();
 
         return mesh;
