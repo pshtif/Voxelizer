@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using g3;
 using UnityEditor;
@@ -13,12 +14,14 @@ namespace BinaryEgo.Voxelizer
 {
     public class Voxelizer : MonoBehaviour
     {
-        public MeshRenderer sourceRenderer;
-
-        public MeshFilter outputFilter;
-
+        public Transform sourceTransform;
+        
         public Vector3 voxelMeshOffset = Vector3.zero;
         public VoxelDensityType voxelDensityType = VoxelDensityType.MAXDIM;
+
+        public VoxelSizeType voxelSizeType = VoxelSizeType.RELATIVE;
+        public float voxelSize = 1;
+        
         [Range(1,100)]
         public int voxelDensity = 20;
         public VoxelizationType voxelizationType = VoxelizationType.SDF;
@@ -35,119 +38,150 @@ namespace BinaryEgo.Voxelizer
         
         public void Voxelize()
         {
-            OnProgress("Voxelizer", "Voxelization initialized", 0);
+            VoxelRenderer.Instance.RemoveAllGroups();
             
-            Mesh mesh = sourceRenderer.GetComponent<MeshFilter>().sharedMesh;
-            Material[] materials = sourceRenderer.sharedMaterials.ToArray();
+            if (sourceTransform == null)
+                return;
+
+            OnProgress("Voxelizer", "Voxelization initialized", 0);
+
+            MeshRenderer[] meshRenderers = sourceTransform.GetComponentsInChildren<MeshRenderer>();
+            
+            for (int i = 0; i<meshRenderers.Length; i++)
+            {
+                MeshRenderer meshRenderer = meshRenderers[i];
+                OnProgress("Voxelizer", "Voxelizing " + meshRenderer.name, (i+1)/(meshRenderers.Length+1));
+                VoxelizeMesh(meshRenderer);
+            }
+            
+            OnComplete();
+        }
+
+        public void VoxelizeMesh(MeshRenderer p_meshRenderer)
+        {
+            MeshFilter filter = p_meshRenderer.GetComponent<MeshFilter>();
+            
+            if (filter == null)
+                return;
+            
+            Mesh mesh = filter.sharedMesh;
+            Material[] materials = p_meshRenderer.sharedMaterials.ToArray();
 
             DMesh3 dmesh = DMeshUtils.UnityMeshToDMesh(mesh, false);
-            
+            dmesh.name = mesh.name;
+
             int cellCount = voxelDensity;
-            float voxelSize;
-            switch (voxelDensityType)
+            switch (voxelSizeType)
             {
-                case VoxelDensityType.MAXDIM:
-                    voxelSize = (float)dmesh.CachedBounds.MaxDim / voxelDensity;
-                    break;
-                case VoxelDensityType.WIDTH:
-                    voxelSize = (float)dmesh.CachedBounds.Width / voxelDensity;
-                    break;
-                case VoxelDensityType.HEIGHT:
-                    voxelSize = (float)dmesh.CachedBounds.Height / voxelDensity;
-                    break;
-                case VoxelDensityType.DEPTH:
-                    voxelSize = (float)dmesh.CachedBounds.Depth / voxelDensity;
-                    break;
-                case VoxelDensityType.DIAGONAL:
-                default:
-                    voxelSize = (float)dmesh.CachedBounds.DiagonalLength / voxelDensity;
-                    break;
-            }
-             
-            if (voxelSize > 0)
-            {
-                DMeshAABBTree3 spatial = new DMeshAABBTree3(dmesh, autoBuild: true);
-                ShiftGridIndexer3 indexer = new ShiftGridIndexer3(dmesh.CachedBounds.Min, voxelSize);
-                
-                Bitmap3 bitmap = new Bitmap3(Vector3i.Zero);
-                Vector3d voxelOffset = Vector3d.Zero;
-                if (!enableVoxelCache || dmesh.name.IsNullOrWhitespace() || _voxelBitmapCache == null ||
-                    !_voxelBitmapCache.ContainsKey(dmesh.name))
-                {
-                    switch (voxelizationType)
+                case VoxelSizeType.RELATIVE:
+                    switch (voxelDensityType)
                     {
-                        case VoxelizationType.SDF:
-                            voxelOffset = -Vector3d.One * voxelSize * 2;
-                            OnProgress("Voxelizer", "Running SDF voxelization.", .2f);
-                            bitmap = VoxelizeMeshUsingSDF(dmesh, spatial, indexer, voxelSize, sampleColor, interpolateColorSampling);
+                        case VoxelDensityType.MAXDIM:
+                            voxelSize = (float)dmesh.CachedBounds.MaxDim / voxelDensity;
                             break;
-                        case VoxelizationType.GRID:
-                            voxelOffset = Vector3d.One * voxelSize/2;
-                            OnProgress("Voxelizer", "Running Grid voxelization.", .2f);
-                            bitmap = VoxelizeMeshUsingGrid(dmesh, voxelSize, spatial, indexer, cellCount, sampleColor,
-                                interpolateColorSampling);
+                        case VoxelDensityType.WIDTH:
+                            voxelSize = (float)dmesh.CachedBounds.Width / voxelDensity;
                             break;
+                        case VoxelDensityType.HEIGHT:
+                            voxelSize = (float)dmesh.CachedBounds.Height / voxelDensity;
+                            break;
+                        case VoxelDensityType.DEPTH:
+                            voxelSize = (float)dmesh.CachedBounds.Depth / voxelDensity;
+                            break;
+                        case VoxelDensityType.DIAGONAL:
                         default:
-                            voxelOffset = Vector3d.One * voxelSize/2;
-                            OnProgress("Voxelizer", "Running Winding voxelization.", .2f);
-                            bitmap = VoxelizeMeshUsingWinding(dmesh, voxelSize, spatial, indexer, cellCount, sampleColor,
-                                interpolateColorSampling);
+                            voxelSize = (float)dmesh.CachedBounds.DiagonalLength / voxelDensity;
                             break;
                     }
-                    
-                    if (enableVoxelCache && !dmesh.name.IsNullOrWhitespace())
-                    {
-                        if (_voxelBitmapCache == null)
-                        {
-                            _voxelBitmapCache = new Dictionary<string, Bitmap3>();
-                        }
-
-                        _voxelBitmapCache[dmesh.name] = bitmap;
-                    }
-                }
-                else
-                {
-                    bitmap = _voxelBitmapCache[dmesh.name];
-                }
-                
-                Vector4[] color;
-                if (!enableVoxelCache || dmesh.name.IsNullOrWhitespace() || _voxelColorCache == null ||
-                    !_voxelColorCache.ContainsKey(dmesh.name))
-                {
-                    OnProgress("Voxelizer", "Generating color buffer.", .6f);
-                    color = GenerateColorBuffer(bitmap, voxelOffset, dmesh, indexer, spatial, materials, interpolateColorSampling);
-                }
-                else
-                {
-                    color = _voxelColorCache[dmesh.name];
-                }
-                
-                OnProgress("Voxelizer", "Generating voxel mesh.", .7f);
-                var voxelMesh = new VoxelMesh(bitmap, color, sourceRenderer.transform, dmesh.CachedBounds, false, voxelSize, Vector3.zero);
-                VoxelRenderer.Instance.RemoveAllGroups();
-                VoxelRenderer.Instance.Add(voxelMesh);
-
-                if (generateMesh)
-                {
-                    OnProgress("Voxelizer", "Generating triangulized mesh.", .8f);
-                    DMesh3 outputMesh = GenerateVoxelMesh(bitmap, voxelSize, voxelOffset, sampleColor, dmesh, indexer,
-                        spatial, interpolateColorSampling, materials);
-                    MeshTransforms.Translate(outputMesh, new Vector3(
-                        (float)dmesh.CachedBounds.Min.x,
-                        (float)dmesh.CachedBounds.Min.y,
-                        (float)dmesh.CachedBounds.Min.z));
-
-                    if (outputFilter == null)
-                    {
-                        var go = new GameObject("VoxelizedMesh");
-                        outputFilter = go.AddComponent<MeshFilter>();
-                    }
-                    
-                    outputFilter.sharedMesh = DMeshUtils.DMeshToUnityMesh(outputMesh);
-                }
+                    break;
+                case VoxelSizeType.ABSOLUTE:
+                    cellCount = Mathf.FloorToInt((float)dmesh.CachedBounds.DiagonalLength / voxelSize);
+                    break;
             }
 
-            OnComplete();
+            if (voxelSize == 0)
+                return;
+            
+            DMeshAABBTree3 spatial = new DMeshAABBTree3(dmesh, autoBuild: true);
+            ShiftGridIndexer3 indexer = new ShiftGridIndexer3(dmesh.CachedBounds.Min, voxelSize);
+            
+            Bitmap3 bitmap = new Bitmap3(Vector3i.Zero);
+            Vector3d voxelOffset = Vector3d.Zero;
+            if (!enableVoxelCache || dmesh.name.IsNullOrWhitespace() || _voxelBitmapCache == null ||
+                !_voxelBitmapCache.ContainsKey(dmesh.name))
+            {
+                switch (voxelizationType)
+                {
+                    case VoxelizationType.SDF:
+                        voxelOffset = -Vector3d.One * voxelSize * 2;
+                        bitmap = VoxelizeMeshUsingSDF(dmesh, spatial, indexer, voxelSize, sampleColor, interpolateColorSampling);
+                        break;
+                    case VoxelizationType.GRID:
+                        voxelOffset = Vector3d.One * voxelSize/2;
+                        bitmap = VoxelizeMeshUsingGrid(dmesh, voxelSize, spatial, indexer, cellCount, sampleColor,
+                            interpolateColorSampling);
+                        break;
+                    default:
+                        voxelOffset = Vector3d.One * voxelSize/2;
+                        bitmap = VoxelizeMeshUsingWinding(dmesh, voxelSize, spatial, indexer, cellCount, sampleColor,
+                            interpolateColorSampling);
+                        break;
+                }
+                
+                if (enableVoxelCache && !dmesh.name.IsNullOrWhitespace())
+                {
+                    if (_voxelBitmapCache == null)
+                    {
+                        _voxelBitmapCache = new Dictionary<string, Bitmap3>();
+                    }
+
+                    _voxelBitmapCache[dmesh.name] = bitmap;
+                }
+            }
+            else
+            {
+                bitmap = _voxelBitmapCache[dmesh.name];
+            }
+            
+            Vector4[] color;
+            if (!enableVoxelCache || dmesh.name.IsNullOrWhitespace() || _voxelColorCache == null ||
+                !_voxelColorCache.ContainsKey(dmesh.name))
+            {
+                color = GenerateColorBuffer(bitmap, voxelOffset, dmesh, indexer, spatial, materials, interpolateColorSampling);
+                
+                if (enableVoxelCache && !dmesh.name.IsNullOrWhitespace())
+                {
+                    if (_voxelColorCache == null)
+                    {
+                        _voxelColorCache = new Dictionary<string, Vector4[]>();
+                    }
+
+                    _voxelColorCache[dmesh.name] = color;
+                }
+            }
+            else
+            {
+                color = _voxelColorCache[dmesh.name];
+            }
+            
+            var voxelMesh = new VoxelMesh(bitmap, color, p_meshRenderer.transform, dmesh.CachedBounds, false, voxelSize, Vector3.zero);
+            VoxelRenderer.Instance.Add(voxelMesh);
+
+            if (generateMesh)
+            {
+                DMesh3 outputMesh = GenerateVoxelMesh(bitmap, voxelSize, voxelOffset, sampleColor, dmesh, indexer,
+                    spatial, interpolateColorSampling, materials);
+                MeshTransforms.Translate(outputMesh, new Vector3(
+                    (float)dmesh.CachedBounds.Min.x,
+                    (float)dmesh.CachedBounds.Min.y,
+                    (float)dmesh.CachedBounds.Min.z));
+
+
+                var go = new GameObject("VoxelizedMesh");
+                go.transform.parent = p_meshRenderer.transform;
+                var outputFilter = go.AddComponent<MeshFilter>();
+                outputFilter.sharedMesh = DMeshUtils.DMeshToUnityMesh(outputMesh);
+            }
         }
 
         public DMesh3 GenerateVoxelMesh(Bitmap3 p_bitmap, double p_voxelSize, Vector3d p_voxelOffset,
@@ -308,7 +342,6 @@ namespace BinaryEgo.Voxelizer
 
         public static Color GetColorAtPoint(DMesh3 p_mesh, int p_triangleIndex, Vector3d p_point,
             Material[] p_materials, bool p_interpolate)
-
         {
             if (p_triangleIndex == DMesh3.InvalidID)
                 return Color.black;
