@@ -25,8 +25,7 @@ public class VoxelRenderer : MonoBehaviour
     public Material voxelMaterial;
     public float cullingDistance = 12;
     public ComputeShader cullingShader;
-    bool shouldBatchDispatch = true;
-    
+
     // Bounds
     public float minX = -10;
     public float minZ = -10;
