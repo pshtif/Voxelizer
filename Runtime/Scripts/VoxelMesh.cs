@@ -14,6 +14,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Jobs;
 
+[Serializable]
 public class VoxelMesh
 {
     public static bool IsCached(string p_name)
@@ -27,6 +28,8 @@ public class VoxelMesh
     private static bool _cacheDisposed = false;
 
     public bool usePhysics = false;
+
+    private float _voxelSize;
 
     public Bitmap3 voxelData;
     public NativeList<int> voxelIndices { get; protected set; }
@@ -70,6 +73,7 @@ public class VoxelMesh
     public VoxelMesh(IBinaryVoxelGrid p_voxelGrid, Vector4[] p_colors, Transform p_transform, AxisAlignedBox3d p_bounds, bool p_generateInside, float p_voxelSize, Vector3 p_offset)
     {
         _transform = p_transform;
+        _voxelSize = p_voxelSize;
 
         if (p_voxelGrid == null)
             return;
@@ -90,7 +94,7 @@ public class VoxelMesh
         // else
         {
             //var bounds = mesh.CachedBounds;
-            var offset = (Vector3)p_bounds.Min - Vector3.one * p_voxelSize * 2.5f;
+            var offset = (Vector3)p_bounds.Min - _voxelSize * 2f * Vector3.one;
             //Vector4[] colors = p_machina.cachedOutput.GetAttribute<Vector4[]>("colorBuffer");
             
             //_vertices = new NativeList<Vector3>(Allocator.Persistent);
@@ -103,27 +107,18 @@ public class VoxelMesh
             {
                 if (p_generateInside || !IsInside(p_voxelGrid, voxelPosition))
                 {
-                    if (usePhysics)
-                    {
-                        var position = new Vector3(voxelPosition.x, voxelPosition.y, voxelPosition.z) * p_voxelSize
-                                       + offset;
-                        position = _transform.localToWorldMatrix.MultiplyPoint(position);
-                        _matrices.Add(Matrix4x4.TRS(position, Quaternion.identity, Vector3.one * p_voxelSize));
-                        //AddPhysicsBox(position, voxelPosition, voxelIndex);
-                        //_vertices.Add(_transform.localToWorldMatrix * position);
-                    }
-                    else
-                    {
-                        _matrices.Add(Matrix4x4.TRS(new Vector3(voxelPosition.x, voxelPosition.y, voxelPosition.z) * p_voxelSize + offset, Quaternion.identity, Vector3.one * p_voxelSize));
-                        //_vertices.Add(new Vector3(nz.x, nz.y, nz.z) * voxelSize + offset);
-                    }
+                    var position = new Vector3(voxelPosition.x, voxelPosition.y, voxelPosition.z) *_voxelSize  +
+                               offset;
+                    _matrices.Add(Matrix4x4.TRS(position, Quaternion.identity, Vector3.one * _voxelSize));
+                    //_vertices.Add(new Vector3(nz.x, nz.y, nz.z) * voxelSize + offset);
 
-                    this.colors.Add(p_colors[colorIndex]);
+                    colors.Add(p_colors[colorIndex]);
                     voxelIndices.Add(voxelIndex++);
                 }
 
                 colorIndex++;
             }
+            Debug.Log(voxelIndex);
             
             // int index = 0;
             // foreach (Vector3i voxelPosition in voxels.NonZeros())
@@ -177,7 +172,7 @@ public class VoxelMesh
     {
         if (_transform == null)
             return;
-        
+
         //if (!_transform.hasChanged || !IsInitialized)
         //    return;
 
@@ -190,8 +185,7 @@ public class VoxelMesh
 
         PositionUpdateJob positionUpdateJob = new PositionUpdateJob
         {
-            usePhysics = true,
-            voxelSize = 1,
+            voxelSize = _voxelSize,
             matrix = _transform.localToWorldMatrix,
             c = colors,
             ids = voxelIndices,
@@ -334,9 +328,7 @@ public class VoxelMesh
     [BurstCompile]
     public struct PositionUpdateJob : IJobParallelFor
     {
-        public bool usePhysics;
-        
-        [ReadOnly] public float4x4 matrix;
+        [ReadOnly] public Matrix4x4 matrix;
         //[ReadOnly] public NativeList<Vector3> positions;
         [ReadOnly] public NativeList<Matrix4x4> inMatrices;
         [ReadOnly] public NativeList<Vector4> c;
@@ -348,15 +340,11 @@ public class VoxelMesh
 
         public void Execute(int index)
         {
-            // float3 vertex;
-            //
-            // Matrix4x4 m = outMatrices[index];
-            // float v = c[index].w == 0 ? 0 : voxelSize;
-            // m.SetColumn(0, new Vector4(v,0,0,0));
-            // m.SetColumn(1, new Vector4(0,v,0,0));
-            // m.SetColumn(2, new Vector4(0,0,v,0));
-            // m.SetColumn(3, new Vector4(vertex.x, vertex.y, vertex.z, 1));
-            outMatrices[index] = inMatrices[index];
+            // Vector3 vertex = inMatrices[index].GetPosition();
+            // vertex = matrix.MultiplyPoint3x4(vertex);
+            // Matrix4x4 outM = inMatrices[index];
+            // outM.SetColumn(3, new Vector4(vertex.x, vertex.y, vertex.z, 1));
+            outMatrices[index] = matrix * inMatrices[index];
             colors[index] = c[index];
         }
     }
