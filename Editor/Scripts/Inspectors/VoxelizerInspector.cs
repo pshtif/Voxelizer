@@ -20,20 +20,40 @@ namespace BinaryEgo.Voxelizer.Editor
 
             EditorGUI.BeginChangeCheck();
 
-            voxelizer.sourceRenderer =
-                (MeshRenderer)EditorGUILayout.ObjectField("Source Renderer", voxelizer.sourceRenderer,
-                    typeof(MeshRenderer), true);
+            voxelizer.sourceTransform =
+                (Transform)EditorGUILayout.ObjectField("Source", voxelizer.sourceTransform,
+                    typeof(Transform), true);
+
+            GUI.enabled = voxelizer.sourceTransform != null;
+
+            if (voxelizer.sourceTransform != null && GUILayout.Button(voxelizer.sourceTransform.gameObject.activeSelf ? "Hide Source" : "Show Source", GUILayout.Height(32)))
+            {
+                voxelizer.sourceTransform.gameObject.SetActive(!voxelizer.sourceTransform.gameObject.activeSelf);
+            }
 
             voxelizer.autoVoxelize = EditorGUILayout.Toggle("Auto Voxelize", voxelizer.autoVoxelize);
 
             voxelizer.voxelizationType =
                 (VoxelizationType)EditorGUILayout.EnumPopup("Voxelization", voxelizer.voxelizationType);
 
-            voxelizer.voxelDensityType = (VoxelDensityType)EditorGUILayout.EnumPopup("Density Type", voxelizer.voxelDensityType);
-            voxelizer.voxelDensity = EditorGUILayout.IntSlider("Voxel Density", voxelizer.voxelDensity, 1, 100);
-            
+            voxelizer.voxelSizeType = (VoxelSizeType)EditorGUILayout.EnumPopup("Voxel Size Type", voxelizer.voxelSizeType);
+
+            switch (voxelizer.voxelSizeType)
+            {
+                case VoxelSizeType.ABSOLUTE:
+                    voxelizer.voxelSize = EditorGUILayout.FloatField("Voxel Size", voxelizer.voxelSize);
+                    break;
+                case VoxelSizeType.RELATIVE:
+                    voxelizer.voxelDensityType =
+                        (VoxelDensityType)EditorGUILayout.EnumPopup("Density Type", voxelizer.voxelDensityType);
+                    voxelizer.voxelDensity = EditorGUILayout.IntSlider("Voxel Density", voxelizer.voxelDensity, 1, 100);
+                    break;
+            }
+
             voxelizer.generateMesh = EditorGUILayout.Toggle("Generate Unity Mesh", voxelizer.generateMesh);
 
+            voxelizer.enableVoxelCache = EditorGUILayout.Toggle("Enable Voxel Cache", voxelizer.enableVoxelCache);
+            
             if (EditorGUI.EndChangeCheck())
             {
                 if (voxelizer.autoVoxelize)
@@ -42,7 +62,7 @@ namespace BinaryEgo.Voxelizer.Editor
                     SceneView.lastActiveSceneView?.Repaint();
                 }
             }
-            
+
             if (GUILayout.Button("Voxelize", GUILayout.Height(32)))
             {
                 voxelizer.Voxelize();
