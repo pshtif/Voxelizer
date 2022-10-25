@@ -6,6 +6,7 @@ namespace BinaryEgo.Voxelizer
 {
     public enum VoxelSizeType
     {
-        
+        ABSOLUTE,
+        RELATIVE
     }
 }
