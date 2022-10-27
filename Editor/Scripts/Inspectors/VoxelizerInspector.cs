@@ -49,6 +49,8 @@ namespace BinaryEgo.Voxelizer.Editor
                     voxelizer.voxelDensity = EditorGUILayout.IntSlider("Voxel Density", voxelizer.voxelDensity, 1, 100);
                     break;
             }
+            
+            voxelizer.voxelBakeTransform = (VoxelBakeTransform)EditorGUILayout.EnumPopup("Voxel Bake Transform", voxelizer.voxelBakeTransform);
 
             voxelizer.generateMesh = EditorGUILayout.Toggle("Generate Unity Mesh", voxelizer.generateMesh);
 

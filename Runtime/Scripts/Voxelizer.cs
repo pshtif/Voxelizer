@@ -25,6 +25,7 @@ namespace BinaryEgo.Voxelizer
         [Range(1,100)]
         public int voxelDensity = 20;
         public VoxelizationType voxelizationType = VoxelizationType.SDF;
+        public VoxelBakeTransform voxelBakeTransform = VoxelBakeTransform.NONE;
         public bool sampleColor = true;
         public bool interpolateColorSampling = true;
         public bool enableVoxelCache = true;
@@ -38,7 +39,11 @@ namespace BinaryEgo.Voxelizer
         
         public void Voxelize()
         {
+            _voxelBitmapCache?.Clear();
+            _voxelColorCache?.Clear();
             VoxelRenderer.Instance.RemoveAllGroups();
+            // Cache for baked transforms not implemented yet
+            enableVoxelCache = enableVoxelCache && voxelBakeTransform == VoxelBakeTransform.NONE;
             
             if (sourceTransform == null)
                 return;
@@ -63,8 +68,28 @@ namespace BinaryEgo.Voxelizer
             
             if (filter == null)
                 return;
+
+            Mesh mesh;
+            if (voxelBakeTransform == VoxelBakeTransform.NONE)
+            {
+                mesh = filter.sharedMesh;
+            }
+            else
+            {
+                mesh = Instantiate(filter.sharedMesh);
+                var matrix = p_meshRenderer.transform.localToWorldMatrix;
+                if (voxelBakeTransform == VoxelBakeTransform.SCALE_AND_ROTATION)
+                {
+                    matrix.SetColumn(3, new Vector4(0, 0, 0, 1));
+                } 
+                var vertices = mesh.vertices;
+                for (int i = 0; i < vertices.Length; i++)
+                {
+                    vertices[i] = matrix.MultiplyPoint3x4(vertices[i]);
+                }
+                mesh.vertices = vertices;
+            }
             
-            Mesh mesh = filter.sharedMesh;
             Material[] materials = p_meshRenderer.sharedMaterials.ToArray();
 
             DMesh3 dmesh = DMeshUtils.UnityMeshToDMesh(mesh, false);
@@ -164,7 +189,7 @@ namespace BinaryEgo.Voxelizer
                 color = _voxelColorCache[dmesh.name];
             }
             
-            var voxelMesh = new VoxelMesh(bitmap, color, p_meshRenderer.transform, dmesh.CachedBounds, false, voxelSize, Vector3.zero);
+            var voxelMesh = new VoxelMesh(bitmap, color, p_meshRenderer.transform, dmesh.CachedBounds, false, voxelSize, voxelBakeTransform);
             VoxelRenderer.Instance.Add(voxelMesh);
 
             if (generateMesh)

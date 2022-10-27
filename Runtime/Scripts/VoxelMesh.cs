@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BinaryEgo.Voxelizer;
 using g3;
 using Unity.Burst;
 using Unity.Collections;
@@ -30,13 +31,13 @@ public class VoxelMesh
     public bool usePhysics = false;
 
     private float _voxelSize;
-
-    public Bitmap3 voxelData;
+    
     public NativeList<int> voxelIndices { get; protected set; }
 
     private Transform _transform;
+    private Matrix4x4 _previousTransformMatrix = Matrix4x4.identity;
     private NativeList<Matrix4x4> _matrices;
-    public NativeList<Vector4> colors;
+    private NativeList<Vector4> _colors;
 
     public bool IsInitialized => _initialized;
     [NonSerialized]
@@ -49,6 +50,7 @@ public class VoxelMesh
     private Transform _physicsContainer;
     private List<Transform> _physicsTransforms;
     private TransformAccessArray _physicsTransformAccessArray;
+    private VoxelBakeTransform _voxelBakeTransform;
 
     public VoxelMesh(string p_name, Transform p_transform)
     {
@@ -59,7 +61,7 @@ public class VoxelMesh
         {
             _usingCache = true;
             //_vertices = POSITION_CACHE[p_name];
-            colors = COLOR_CACHE[p_name];
+            _colors = COLOR_CACHE[p_name];
             voxelIndices = INDEX_CACHE[p_name];
         }
         else
@@ -70,10 +72,11 @@ public class VoxelMesh
         _initialized = true;
     }
     
-    public VoxelMesh(IBinaryVoxelGrid p_voxelGrid, Vector4[] p_colors, Transform p_transform, AxisAlignedBox3d p_bounds, bool p_generateInside, float p_voxelSize, Vector3 p_offset)
+    public VoxelMesh(IBinaryVoxelGrid p_voxelGrid, Vector4[] p_colors, Transform p_transform, AxisAlignedBox3d p_bounds, bool p_generateInside, float p_voxelSize, VoxelBakeTransform p_voxelBakeTransform)
     {
         _transform = p_transform;
         _voxelSize = p_voxelSize;
+        _voxelBakeTransform = p_voxelBakeTransform; 
 
         if (p_voxelGrid == null)
             return;
@@ -99,7 +102,7 @@ public class VoxelMesh
             
             //_vertices = new NativeList<Vector3>(Allocator.Persistent);
             _matrices = new NativeList<Matrix4x4>(Allocator.Persistent);
-            this.colors = new NativeList<Vector4>(Allocator.Persistent);
+            this._colors = new NativeList<Vector4>(Allocator.Persistent);
             voxelIndices = new NativeList<int>(Allocator.Persistent);
             int colorIndex = 0;
             int voxelIndex = 0;
@@ -112,14 +115,13 @@ public class VoxelMesh
                     _matrices.Add(Matrix4x4.TRS(position, Quaternion.identity, Vector3.one * _voxelSize));
                     //_vertices.Add(new Vector3(nz.x, nz.y, nz.z) * voxelSize + offset);
 
-                    colors.Add(p_colors[colorIndex]);
+                    _colors.Add(p_colors[colorIndex]);
                     voxelIndices.Add(voxelIndex++);
                 }
 
                 colorIndex++;
             }
-            Debug.Log(voxelIndex);
-            
+
             // int index = 0;
             // foreach (Vector3i voxelPosition in voxels.NonZeros())
             // {
@@ -154,6 +156,7 @@ public class VoxelMesh
         //     _physicsTransformAccessArray = new TransformAccessArray(_physicsTransforms.ToArray());
         // }
 
+        _transform.hasChanged = true;
         _initialized = true;
     }
 
@@ -161,8 +164,8 @@ public class VoxelMesh
     {
         //_vertices = new NativeList<Vector3>(_vertices.Length, Allocator.Persistent);
         //_vertices.AddRangeNoResize(POSITION_CACHE[_cacheName]);
-        colors = new NativeList<Vector4>(colors.Length, Allocator.Persistent);
-        colors.AddRangeNoResize(COLOR_CACHE[_cacheName]);
+        _colors = new NativeList<Vector4>(_colors.Length, Allocator.Persistent);
+        _colors.AddRangeNoResize(COLOR_CACHE[_cacheName]);
         voxelIndices = new NativeList<int>(voxelIndices.Length, Allocator.Persistent);
         voxelIndices.AddRangeNoResize(INDEX_CACHE[_cacheName]);
         _usingCache = false;
@@ -170,50 +173,62 @@ public class VoxelMesh
     
     public void Invalidate(ComputeBuffer p_matrixBuffer, NativeArray<Matrix4x4> p_matrixArray, ComputeBuffer p_colorBuffer, NativeArray<Vector4> p_colorArray, int p_index)
     {
-        if (_transform == null)
+        if (_transform == null || !_transform.hasChanged || _voxelBakeTransform == VoxelBakeTransform.ALL)
+        {
+            p_matrixBuffer.SetData(_matrices.AsArray(), 0, p_index, voxelIndices.Length);
+            p_colorBuffer.SetData(_colors.AsArray(), 0, p_index, voxelIndices.Length);
             return;
-
-        //if (!_transform.hasChanged || !IsInitialized)
-        //    return;
+        }
 
         VoxelRenderer.isDirty = true;
         
-        NativeSlice<Matrix4x4> outMatrixSlice = new NativeSlice<Matrix4x4>(p_matrixArray, p_index);
         NativeSlice<Vector4> outColorSlice = new NativeSlice<Vector4>(p_colorArray, p_index);
 
-        NativeSlice<Matrix4x4> inMatrixSlice = new NativeSlice<Matrix4x4>(_matrices.AsArray());
+        Matrix4x4 transformMatrix;
+
+        if (_voxelBakeTransform == VoxelBakeTransform.SCALE_AND_ROTATION)
+        {
+            transformMatrix = Matrix4x4.identity;
+            transformMatrix.SetColumn(3, _transform.localToWorldMatrix.GetColumn(3));
+        }
+        else
+        {
+            transformMatrix = _transform.localToWorldMatrix;
+        }
 
         PositionUpdateJob positionUpdateJob = new PositionUpdateJob
         {
             voxelSize = _voxelSize,
-            matrix = _transform.localToWorldMatrix,
-            c = colors,
+            previousTransformMatrixI = _previousTransformMatrix.inverse,
+            transformMatrix = transformMatrix,
+            c = _colors,
             ids = voxelIndices,
-            inMatrices = _matrices,
-            outMatrices =  outMatrixSlice,
+            matrices = _matrices,
+            //outMatrices =  outMatrixSlice,
             colors = outColorSlice,
         };
 
-        if (usePhysics)
-        {
-            PhysicsUpdateJob physicsUpdateJob = new PhysicsUpdateJob
-            {
-                matrices = inMatrixSlice
-            };
-            JobHandle physicsJobHandle = physicsUpdateJob.Schedule(_physicsTransformAccessArray);
-            
-            JobHandle jobHandle = positionUpdateJob.Schedule(voxelIndices.Length, 100, physicsJobHandle);
-            jobHandle.Complete();
-        }
-        else
+        // if (usePhysics)
+        // {
+        //     PhysicsUpdateJob physicsUpdateJob = new PhysicsUpdateJob
+        //     {
+        //         matrices = inMatrixSlice
+        //     };
+        //     JobHandle physicsJobHandle = physicsUpdateJob.Schedule(_physicsTransformAccessArray);
+        //     
+        //     JobHandle jobHandle = positionUpdateJob.Schedule(voxelIndices.Length, 100, physicsJobHandle);
+        //     jobHandle.Complete();
+        // }
+        // else
         {
             JobHandle jobHandle = positionUpdateJob.Schedule(voxelIndices.Length, 100);
             jobHandle.Complete();
         }
         
         _transform.hasChanged = false;
+        _previousTransformMatrix = transformMatrix;
 
-        p_matrixBuffer.SetData(p_matrixArray, p_index, p_index, voxelIndices.Length);
+        p_matrixBuffer.SetData(_matrices.AsArray(), 0, p_index, voxelIndices.Length);
         p_colorBuffer.SetData(p_colorArray, p_index, p_index, voxelIndices.Length);
     }
 
@@ -245,7 +260,7 @@ public class VoxelMesh
         {
             if (Vector3.Distance(_matrices[i].GetColumn(3), p_point) < p_radius)
             {
-                colors[i] = p_color;
+                _colors[i] = p_color;
             }
         }
         
@@ -283,8 +298,8 @@ public class VoxelMesh
     {
         if (!_usingCache && _matrices.IsCreated)
         {
-            colors.Dispose();
-            colors = default;
+            _colors.Dispose();
+            _colors = default;
             voxelIndices.Dispose();
             voxelIndices = default;
             _matrices.Dispose();
@@ -328,23 +343,21 @@ public class VoxelMesh
     [BurstCompile]
     public struct PositionUpdateJob : IJobParallelFor
     {
-        [ReadOnly] public Matrix4x4 matrix;
+        [ReadOnly] public Matrix4x4 previousTransformMatrixI;
+        [ReadOnly] public Matrix4x4 transformMatrix;
         //[ReadOnly] public NativeList<Vector3> positions;
-        [ReadOnly] public NativeList<Matrix4x4> inMatrices;
+        //[ReadOnly] public NativeList<Matrix4x4> inMatrices;
         [ReadOnly] public NativeList<Vector4> c;
         [ReadOnly] public NativeList<int> ids;
         [ReadOnly] public float voxelSize;
 
-        public NativeSlice<Matrix4x4> outMatrices;
+        public NativeArray<Matrix4x4> matrices;
         public NativeSlice<Vector4> colors;
 
         public void Execute(int index)
         {
-            // Vector3 vertex = inMatrices[index].GetPosition();
-            // vertex = matrix.MultiplyPoint3x4(vertex);
-            // Matrix4x4 outM = inMatrices[index];
-            // outM.SetColumn(3, new Vector4(vertex.x, vertex.y, vertex.z, 1));
-            outMatrices[index] = matrix * inMatrices[index];
+            Matrix4x4 matrix = previousTransformMatrixI * matrices[index];
+            matrices[index] = transformMatrix * matrix;
             colors[index] = c[index];
         }
     }
