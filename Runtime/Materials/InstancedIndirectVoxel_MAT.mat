@@ -9,8 +9,7 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: InstancedIndirectVoxel_MAT
   m_Shader: {fileID: 4800000, guid: 0f18036db9299bf4e8ac4dbc34722782, type: 3}
-  m_ValidKeywords:
-  - ENABLE_BILLBOARD
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
@@ -74,7 +73,7 @@ Material:
     - _Cutoff: 0.5
     - _DrawDistance: 125
     - _DstBlend: 0
-    - _EnableBillboard: 1
+    - _EnableBillboard: 0
     - _EnableCulling: 0
     - _EnableTexture: 0
     - _EnvironmentReflections: 1
@@ -94,7 +93,7 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _Surface: 0
-    - _VoxelScale: 2.5
+    - _VoxelScale: 1
     - _WindAFrequency: 4
     - _WindAIntensity: 1.77
     - _WindBFrequency: 7.7
