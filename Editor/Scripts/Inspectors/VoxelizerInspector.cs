@@ -2,7 +2,9 @@
  *	Created by:  Peter @sHTiF Stefcek
  */
 
+using Plugins.Voxelizer.Editor.Scripts;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 
 namespace BinaryEgo.Voxelizer.Editor
@@ -16,20 +18,72 @@ namespace BinaryEgo.Voxelizer.Editor
         {
             var voxelizer = (target as Voxelizer);
             
-            GUILayout.Label("VOXELIZER", Skin.GetStyle("editor_title"), GUILayout.Height(32));
+            GUILayout.Label("<color=#FF8800>VOXELIZER</color>", Skin.GetStyle("editor_title"), GUILayout.Height(24));
+            GUILayout.Label("VERSION "+Voxelizer.VERSION, Skin.GetStyle("editor_version"), GUILayout.Height(16));
 
             EditorGUI.BeginChangeCheck();
 
+            GUILayout.Space(2);
+            
+            DrawSourceSection();
+            
+            GUILayout.Space(2);
+
+            DrawVoxelSection();
+            
+            GUILayout.Space(2);
+            
+            DrawAdditionalSection();
+            
+            GUILayout.Space(2);
+            
+            if (EditorGUI.EndChangeCheck())
+            {
+                if (voxelizer.autoVoxelize)
+                {
+                    voxelizer.Voxelize();
+                    SceneView.lastActiveSceneView?.Repaint();
+                }
+            }
+
+            GUI.color = new Color(0.9f, .5f, 0);
+            
+            if (GUIUtils.DrawButton("VOXELIZE"))
+            {
+                voxelizer.Voxelize();
+            }
+
+            GUI.color = Color.white;
+        }
+
+        public void DrawSourceSection()
+        {
+            var voxelizer = (target as Voxelizer);
+            
+            if (!GUIUtils.DrawMinimizableSectionTitle("SOURCE SETTINGS: ", ref voxelizer.sourceSectionMinimized))
+                return;
+            
             voxelizer.sourceTransform =
                 (Transform)EditorGUILayout.ObjectField("Source", voxelizer.sourceTransform,
                     typeof(Transform), true);
+            voxelizer.sourceLayerMask = EditorGUILayout.MaskField("Source Mask", voxelizer.sourceLayerMask, InternalEditorUtility.layers);
 
             GUI.enabled = voxelizer.sourceTransform != null;
-
-            if (voxelizer.sourceTransform != null && GUILayout.Button(voxelizer.sourceTransform.gameObject.activeSelf ? "Hide Source" : "Show Source", GUILayout.Height(32)))
+            
+            if (voxelizer.sourceTransform != null && GUIUtils.DrawButton(voxelizer.sourceTransform.gameObject.activeSelf ? "HIDE SOURCE" : "SHOW SOURCE"))
             {
                 voxelizer.sourceTransform.gameObject.SetActive(!voxelizer.sourceTransform.gameObject.activeSelf);
             }
+        }
+
+        public void DrawVoxelSection()
+        {
+            var voxelizer = (target as Voxelizer);
+
+            if (!GUIUtils.DrawMinimizableSectionTitle("VOXEL SETTINGS: ", ref voxelizer.voxelSectionMinimized))
+                return;
+            
+            GUI.enabled = voxelizer.sourceTransform != null;
 
             voxelizer.autoVoxelize = EditorGUILayout.Toggle("Auto Voxelize", voxelizer.autoVoxelize);
 
@@ -52,23 +106,17 @@ namespace BinaryEgo.Voxelizer.Editor
             
             voxelizer.voxelBakeTransform = (VoxelBakeTransform)EditorGUILayout.EnumPopup("Voxel Bake Transform", voxelizer.voxelBakeTransform);
 
-            voxelizer.generateMesh = EditorGUILayout.Toggle("Generate Unity Mesh", voxelizer.generateMesh);
-
             voxelizer.enableVoxelCache = EditorGUILayout.Toggle("Enable Voxel Cache", voxelizer.enableVoxelCache);
-            
-            if (EditorGUI.EndChangeCheck())
-            {
-                if (voxelizer.autoVoxelize)
-                {
-                    voxelizer.Voxelize();
-                    SceneView.lastActiveSceneView?.Repaint();
-                }
-            }
+        }
 
-            if (GUILayout.Button("Voxelize", GUILayout.Height(32)))
-            {
-                voxelizer.Voxelize();
-            }
+        public void DrawAdditionalSection()
+        {
+            var voxelizer = (target as Voxelizer);
+
+            if (!GUIUtils.DrawMinimizableSectionTitle("ADDITIONAL SETTINGS: ", ref voxelizer.additionalSectionMinimized))
+                return;
+            
+            voxelizer.generateMesh = EditorGUILayout.Toggle("Generate Unity Mesh", voxelizer.generateMesh);
         }
     }
 }

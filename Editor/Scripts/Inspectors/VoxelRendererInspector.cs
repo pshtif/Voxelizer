@@ -11,12 +11,13 @@ namespace BinaryEgo.Voxelizer.Editor
     public class VoxelRendererInspector : UnityEditor.Editor
     {
         public static GUISkin Skin => (GUISkin)Resources.Load("Skins/VoxelizerEditorSkin");
-        
+
         public override void OnInspectorGUI()
         {
             var voxelRenderer = (target as VoxelRenderer);
             
-            GUILayout.Label("VOXEL RENDERER", Skin.GetStyle("editor_title"), GUILayout.Height(32));
+            GUILayout.Label("<color=#FF8800>VOXEL RENDERER</color>", Skin.GetStyle("editor_title"), GUILayout.Height(24));
+            GUILayout.Label("VERSION "+Voxelizer.VERSION, Skin.GetStyle("editor_version"), GUILayout.Height(16));
 
             EditorGUI.BeginChangeCheck();
 
