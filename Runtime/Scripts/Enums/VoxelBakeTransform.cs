@@ -6,8 +6,9 @@ namespace BinaryEgo.Voxelizer
 {
     public enum VoxelBakeTransform
     {
-        ALL,
-        SCALE_AND_ROTATION,
-        NONE
+        NONE,
+        SCALE,
+        SCALE_ROTATION,
+        SCALE_ROTATION_POSITION
     }
 }
