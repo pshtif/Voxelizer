@@ -173,7 +173,7 @@ public class VoxelMesh
     
     public void Invalidate(ComputeBuffer p_matrixBuffer, NativeArray<Matrix4x4> p_matrixArray, ComputeBuffer p_colorBuffer, NativeArray<Vector4> p_colorArray, int p_index)
     {
-        if (_transform == null || !_transform.hasChanged || _voxelBakeTransform == VoxelBakeTransform.ALL)
+        if (_transform == null || !_transform.hasChanged || _voxelBakeTransform == VoxelBakeTransform.SCALE_ROTATION_POSITION)
         {
             p_matrixBuffer.SetData(_matrices.AsArray(), 0, p_index, voxelIndices.Length);
             p_colorBuffer.SetData(_colors.AsArray(), 0, p_index, voxelIndices.Length);
@@ -186,14 +186,18 @@ public class VoxelMesh
 
         Matrix4x4 transformMatrix;
 
-        if (_voxelBakeTransform == VoxelBakeTransform.SCALE_AND_ROTATION)
+        switch (_voxelBakeTransform)
         {
-            transformMatrix = Matrix4x4.identity;
-            transformMatrix.SetColumn(3, _transform.localToWorldMatrix.GetColumn(3));
-        }
-        else
-        {
-            transformMatrix = _transform.localToWorldMatrix;
+            case VoxelBakeTransform.SCALE:
+                transformMatrix = Matrix4x4.Translate(_transform.localToWorldMatrix.GetPosition()) *
+                                  Matrix4x4.Rotate(_transform.localToWorldMatrix.rotation);
+                break;
+            case VoxelBakeTransform.SCALE_ROTATION:
+                transformMatrix = Matrix4x4.Translate(_transform.localToWorldMatrix.GetPosition());
+                break;
+            default:
+                transformMatrix = _transform.localToWorldMatrix;
+                break;
         }
 
         PositionUpdateJob positionUpdateJob = new PositionUpdateJob
