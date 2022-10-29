@@ -14,7 +14,16 @@ namespace BinaryEgo.Voxelizer
 {
     public class Voxelizer : MonoBehaviour
     {
+        public static string VERSION = "0.1.2";
+        
+        #if UNITY_EDITOR
+        public bool sourceSectionMinimized = false;
+        public bool voxelSectionMinimized = false;
+        public bool additionalSectionMinimized = false;
+        #endif
+        
         public Transform sourceTransform;
+        public int sourceLayerMask;
         
         public Vector3 voxelMeshOffset = Vector3.zero;
         public VoxelDensityType voxelDensityType = VoxelDensityType.MAXDIM;
@@ -24,6 +33,7 @@ namespace BinaryEgo.Voxelizer
         
         [Range(1,100)]
         public int voxelDensity = 20;
+        
         public VoxelizationType voxelizationType = VoxelizationType.SDF;
         public VoxelBakeTransform voxelBakeTransform = VoxelBakeTransform.NONE;
         public bool sampleColor = true;
@@ -55,6 +65,10 @@ namespace BinaryEgo.Voxelizer
             for (int i = 0; i<meshRenderers.Length; i++)
             {
                 MeshRenderer meshRenderer = meshRenderers[i];
+                
+                if (sourceLayerMask != (sourceLayerMask | (1 << meshRenderer.gameObject.layer)))
+                    continue;
+                
                 OnProgress("Voxelizer", "Voxelizing " + meshRenderer.name, (i+1)/(meshRenderers.Length+1));
                 VoxelizeMesh(meshRenderer);
             }
@@ -78,10 +92,16 @@ namespace BinaryEgo.Voxelizer
             {
                 mesh = Instantiate(filter.sharedMesh);
                 var matrix = p_meshRenderer.transform.localToWorldMatrix;
-                if (voxelBakeTransform == VoxelBakeTransform.SCALE_AND_ROTATION)
+                switch (voxelBakeTransform)
                 {
-                    matrix.SetColumn(3, new Vector4(0, 0, 0, 1));
-                } 
+                    case VoxelBakeTransform.SCALE_ROTATION:
+                        matrix.SetColumn(3, new Vector4(0, 0, 0, 1));
+                        break;
+                    case VoxelBakeTransform.SCALE:
+                        matrix = Matrix4x4.Scale(matrix.lossyScale);
+                        break;
+                }
+
                 var vertices = mesh.vertices;
                 for (int i = 0; i < vertices.Length; i++)
                 {
