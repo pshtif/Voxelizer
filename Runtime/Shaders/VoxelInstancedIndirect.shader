@@ -144,18 +144,16 @@ Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
         Pass
         {
             Tags { "LightMode" = "ShadowCaster" }
-            
-            Cull Off
-            Blend One Zero
+
+            ZWrite On 
             ZTest LEqual
-            ZWrite On
             ColorMask 0
+            Cull Back
 
             HLSLPROGRAM
             #pragma target 3.0
             #pragma vertex vert
             #pragma fragment frag
-            #pragma shader_feature CULLING
             
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
@@ -180,7 +178,7 @@ Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
 
             CBUFFER_START(UnityPerMaterial)
                 float2 _BoundSize;
-            float _VoxelScale;
+                float _VoxelScale;
 
                 StructuredBuffer<float4> _colorBuffer;
                 StructuredBuffer<float4x4> _matrixBuffer;
