@@ -1,7 +1,7 @@
 {
   "name": "com.binaryego.voxelizer",
   "displayName": "Voxelizer",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "unity": "2021.3",
   "description": "Voxelizer tool for editor and runtime voxelization.",
   "author": {
