@@ -297,6 +297,18 @@ public class VoxelRenderer : MonoBehaviour
             voxelMaterial.SetFloat("_VoxelScale", voxelScale);
         }
 
+        if (voxelMaterial.HasFloat("_EnableBillboard")) 
+        {
+            if (voxelMeshType == VoxelMeshType.QUAD)
+            {
+                voxelMaterial.EnableKeyword("ENABLE_BILLBOARD");
+            }
+            else
+            {
+                voxelMaterial.DisableKeyword("ENABLE_BILLBOARD");
+            }
+        }
+
         Graphics.DrawMeshInstancedIndirect(_voxelMesh, 0, voxelMaterial, _renderBounds, _voxelIndirectBuffer, 0, null,
             ShadowCastingMode.On, true, 0, p_camera);
     }
