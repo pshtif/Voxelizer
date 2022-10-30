@@ -18,6 +18,11 @@ public enum VoxelMeshType
 [ExecuteInEditMode]
 public class VoxelRenderer : MonoBehaviour
 {
+    #if UNITY_EDITOR
+    public bool renderSectionMinimized = false;
+    public bool materialSectionMinimized = false;
+    #endif
+    
     static public VoxelRenderer Instance { get; private set; }
     static public int voxelCount { get; private set; }
     static public bool isDirty = false;
@@ -33,33 +38,21 @@ public class VoxelRenderer : MonoBehaviour
     public float maxZ = 10;
     
     private Plane[] cameraFrustumPlanes = new Plane[6];
-    private int cellCountX = -1;
-    private int cellCountZ = -1;
-    private bool useCells = false;
-    
-    public float cellSizeX = 2; //unity unit (m)
-    public float cellSizeZ = 2; //unity unit (m)
+    //private int cellCountX = -1;
+    //private int cellCountZ = -1;
+    //private bool useCells = false;
+    // public float cellSizeX = 2; 
+    // public float cellSizeZ = 2;
     
     private List<Matrix4x4>[] cellMatrices;
     private NativeList<int> _visibleCells;
     
     public bool enableCulling;
+    public bool useBillboarding = false;
+    public float voxelScale = 1;
 
     [NonSerialized]
     private bool _initialized = false;
-
-    public bool ToggleCulling
-    {
-        get
-        {
-            return enableCulling;
-        }
-
-        set
-        {
-            enableCulling = value;
-        }
-    }
 
     public int voxelCacheSize = 1000000;
 
@@ -86,6 +79,19 @@ public class VoxelRenderer : MonoBehaviour
     void Awake()
     {
         Initialize();
+    }
+    
+    public bool ToggleCulling
+    {
+        get
+        {
+            return enableCulling;
+        }
+
+        set
+        {
+            enableCulling = value;
+        }
     }
 
     void Initialize()
@@ -202,14 +208,6 @@ public class VoxelRenderer : MonoBehaviour
 #if UNITY_EDITOR
         if (!Application.isPlaying)
             return;
-
-        if (_initialized && ((voxelMeshType == VoxelMeshType.CUSTOM && _voxelMesh != customVoxelMesh) || voxelMeshType != _previousVoxelMeshType))
-        {
-            if (InitializeVoxelMesh())
-            {
-                UpdateIndirectMeshBuffer();
-            }
-        }
 #endif
         Render();
     }
@@ -217,6 +215,14 @@ public class VoxelRenderer : MonoBehaviour
     void Render(Camera p_camera = null)
     {
         Initialize();
+        
+        if (_initialized && ((voxelMeshType == VoxelMeshType.CUSTOM && _voxelMesh != customVoxelMesh) || voxelMeshType != _previousVoxelMeshType))
+        {
+            if (InitializeVoxelMesh())
+            {
+                UpdateIndirectMeshBuffer();
+            }
+        }
 
         // asyncRequest.WaitForCompletion(); 
         // if (!asyncRequest.hasError)
@@ -237,10 +243,21 @@ public class VoxelRenderer : MonoBehaviour
                 }
             }
 
-            if (enableCulling && useCells)
+            if (enableCulling && cullingShader != null)
             {
-                CellInvalidation();
+                voxelMaterial.EnableKeyword("CULLING");
+                cullingShader.SetBuffer(0, "_matrixBuffer", _matrixBuffer);
+                cullingShader.SetBuffer(0, "_visibilityBuffer", _visibleIdBuffer);
             }
+            else
+            {
+                voxelMaterial.DisableKeyword("CULLING");
+            }
+
+            // if (enableCulling && useCells)
+            // {
+            //     CellInvalidation();
+            // }
 
             isDirty = false;
         }
@@ -257,10 +274,9 @@ public class VoxelRenderer : MonoBehaviour
         if (index == 0)
             return;
 
-        if (enableCulling)
+        if (enableCulling && cullingShader != null)
         {
-            voxelMaterial.EnableKeyword("CULLING");
-            CellCulling();
+            //CellCulling();
             VoxelGPUCulling();
             ComputeBuffer.CopyCount(_visibleIdBuffer, _voxelIndirectBuffer, 4);
             
@@ -269,7 +285,6 @@ public class VoxelRenderer : MonoBehaviour
         }
         else
         {
-            voxelMaterial.DisableKeyword("CULLING");
             _indirectArgs[1] = (uint)index;
             _voxelIndirectBuffer.SetData(_indirectArgs);
         }
@@ -277,81 +292,86 @@ public class VoxelRenderer : MonoBehaviour
         voxelCount = index;
         _renderBounds.SetMinMax(new Vector3(minX, -5, minZ), new Vector3(maxX, 5, maxZ));
 
+        if (voxelMaterial.HasFloat("_VoxelScale"))
+        {
+            voxelMaterial.SetFloat("_VoxelScale", voxelScale);
+        }
+
         Graphics.DrawMeshInstancedIndirect(_voxelMesh, 0, voxelMaterial, _renderBounds, _voxelIndirectBuffer, 0, null,
             ShadowCastingMode.On, true, 0, p_camera);
     }
     
-    private void CellInvalidation()
-    {
-        Debug.Log("CellInvalidation");
-        
-        cellCountX = Mathf.CeilToInt((maxX - minX) / cellSizeX); 
-        cellCountZ = Mathf.CeilToInt((maxZ - minZ) / cellSizeZ);
-        
-        cellMatrices = new List<Matrix4x4>[cellCountX * cellCountZ]; 
-        var cellColors = new List<Vector4>[cellCountX * cellCountZ];
-        for (int i = 0; i < cellMatrices.Length; i++)
-        {
-            cellMatrices[i] = new List<Matrix4x4>();
-            cellColors[i] = new List<Vector4>();
-        }
-    
-        for (int i = 0; i < _matrixArray.Length; i++)
-        {
-            Matrix4x4 matrix = _matrixArray[i];
-            Vector3 pos = matrix.GetColumn(3);
-
-            int xID = Mathf.Min(cellCountX - 1, Mathf.FloorToInt(Mathf.InverseLerp(minX, maxX, pos.x) * cellCountX));
-            int zID = Mathf.Min(cellCountZ - 1, Mathf.FloorToInt(Mathf.InverseLerp(minZ, maxZ, pos.z) * cellCountZ));
-    
-            cellMatrices[xID + zID * cellCountX].Add(matrix);
-            cellColors[xID + zID * cellCountX].Add(_colorArray[i]);
-        }
-        
-        int offset = 0;
-        Matrix4x4[] voxelMatrixSortedByCell = new Matrix4x4[_matrixArray.Length];
-        Vector4[] voxelColorSortedByCell = new Vector4[_colorArray.Length];
-        for (int i = 0; i < cellMatrices.Length; i++)
-        {
-            for (int j = 0; j < cellMatrices[i].Count; j++)
-            {
-                voxelMatrixSortedByCell[offset] = cellMatrices[i][j];
-                voxelColorSortedByCell[offset] = cellColors[i][j];
-                offset++;
-            }
-        }
-        
-        _matrixBuffer.SetData(voxelMatrixSortedByCell);
-        _colorBuffer.SetData(voxelColorSortedByCell);
-    }
-    
-    private void CellCulling()
-    {
-        if (cellMatrices == null)
-            return;
-        
-        _visibleCells.Clear();
-        Camera cam = Camera.main;
-        
-        float cameraOriginalFarPlane = cam.farClipPlane;
-        cam.farClipPlane = cullingDistance;
-        GeometryUtility.CalculateFrustumPlanes(cam, cameraFrustumPlanes);
-        cam.farClipPlane = cameraOriginalFarPlane;
-
-        for (int i = 0; i < cellMatrices.Length; i++)
-        {
-            Vector3 centerPosWS = new Vector3 (i % cellCountX + 0.5f, 0, i / cellCountX + 0.5f);
-            centerPosWS.x = Mathf.Lerp(minX, maxX, centerPosWS.x / cellCountX);
-            centerPosWS.z = Mathf.Lerp(minZ, maxZ, centerPosWS.z / cellCountZ);
-            Vector3 sizeWS = new Vector3(Mathf.Abs(maxX - minX) / cellCountX,0,Mathf.Abs(maxX - minX) / cellCountX);
-            Bounds cellBound = new Bounds(centerPosWS, sizeWS);
-
-            if (GeometryUtility.TestPlanesAABB(cameraFrustumPlanes, cellBound) && cellMatrices[i].Count > 0) 
-            {
-                _visibleCells.Add(i);
-            }
-        }
-    }
+    // private void CellInvalidation()
+    // {
+    //     Debug.Log("CellInvalidation");
+    //     
+    //     cellCountX = Mathf.CeilToInt((maxX - minX) / cellSizeX); 
+    //     cellCountZ = Mathf.CeilToInt((maxZ - minZ) / cellSizeZ);
+    //     
+    //     cellMatrices = new List<Matrix4x4>[cellCountX * cellCountZ]; 
+    //     var cellColors = new List<Vector4>[cellCountX * cellCountZ];
+    //     for (int i = 0; i < cellMatrices.Length; i++)
+    //     {
+    //         cellMatrices[i] = new List<Matrix4x4>();
+    //         cellColors[i] = new List<Vector4>();
+    //     }
+    //
+    //     for (int i = 0; i < _matrixArray.Length; i++)
+    //     {
+    //         Matrix4x4 matrix = _matrixArray[i];
+    //         Vector3 pos = matrix.GetColumn(3);
+    //
+    //         int xID = Mathf.Min(cellCountX - 1, Mathf.FloorToInt(Mathf.InverseLerp(minX, maxX, pos.x) * cellCountX));
+    //         int zID = Mathf.Min(cellCountZ - 1, Mathf.FloorToInt(Mathf.InverseLerp(minZ, maxZ, pos.z) * cellCountZ));
+    //
+    //         cellMatrices[xID + zID * cellCountX].Add(matrix);
+    //         cellColors[xID + zID * cellCountX].Add(_colorArray[i]);
+    //     }
+    //     
+    //     int offset = 0;
+    //     Matrix4x4[] voxelMatrixSortedByCell = new Matrix4x4[_matrixArray.Length];
+    //     Vector4[] voxelColorSortedByCell = new Vector4[_colorArray.Length];
+    //     for (int i = 0; i < cellMatrices.Length; i++)
+    //     {
+    //         for (int j = 0; j < cellMatrices[i].Count; j++)
+    //         {
+    //             voxelMatrixSortedByCell[offset] = cellMatrices[i][j];
+    //             voxelColorSortedByCell[offset] = cellColors[i][j];
+    //             offset++;
+    //         }
+    //     }
+    //     
+    //     _matrixBuffer.SetData(voxelMatrixSortedByCell);
+    //     _colorBuffer.SetData(voxelColorSortedByCell);
+    // }
+    //
+    // private void CellCulling()
+    // {
+    //     if (cellMatrices == null)
+    //         return;
+    //     
+    //     _visibleCells.Clear();
+    //     Camera cam = Camera.main;
+    //     
+    //     float cameraOriginalFarPlane = cam.farClipPlane;
+    //     cam.farClipPlane = cullingDistance;
+    //     GeometryUtility.CalculateFrustumPlanes(cam, cameraFrustumPlanes);
+    //     cam.farClipPlane = cameraOriginalFarPlane;
+    //
+    //     for (int i = 0; i < cellMatrices.Length; i++)
+    //     {
+    //         Vector3 centerPosWS = new Vector3 (i % cellCountX + 0.5f, 0, i / cellCountX + 0.5f);
+    //         centerPosWS.x = Mathf.Lerp(minX, maxX, centerPosWS.x / cellCountX);
+    //         centerPosWS.z = Mathf.Lerp(minZ, maxZ, centerPosWS.z / cellCountZ);
+    //         Vector3 sizeWS = new Vector3(Mathf.Abs(maxX - minX) / cellCountX,0,Mathf.Abs(maxX - minX) / cellCountX);
+    //         Bounds cellBound = new Bounds(centerPosWS, sizeWS);
+    //
+    //         if (GeometryUtility.TestPlanesAABB(cameraFrustumPlanes, cellBound) && cellMatrices[i].Count > 0) 
+    //         {
+    //             _visibleCells.Add(i);
+    //         }
+    //     }
+    // }
     
     private void VoxelGPUCulling()
     {
@@ -366,47 +386,48 @@ public class VoxelRenderer : MonoBehaviour
         
         float threadCount = 64;
         float batchLimit = 65535 * threadCount;
-        if (useCells) 
+        // if (useCells) 
+        // {
+        //     var dispatchCount = 0;
+        //     for (int i = 0; i < _visibleCells.Length; i++)
+        //     {
+        //         int targetCellFlattenID = _visibleCells[i];
+        //         int memoryOffset = 0;
+        //         for (int j = 0; j < targetCellFlattenID; j++)
+        //         {
+        //             memoryOffset += cellMatrices[j].Count;
+        //         }
+        //         
+        //         int batchSize = cellMatrices[targetCellFlattenID].Count;
+        //         
+        //         while (i < _visibleCells.Length - 1 && _visibleCells[i + 1] == _visibleCells[i] + 1)
+        //         {
+        //             batchSize += cellMatrices[_visibleCells[i + 1]].Count;
+        //             i++;
+        //         }
+        //         
+        //         if (batchSize < batchLimit)
+        //         {
+        //             cullingShader.SetInt("_batchOffset", memoryOffset);
+        //             cullingShader.Dispatch(0, Mathf.CeilToInt(batchSize / threadCount), 1, 1);
+        //             dispatchCount++;
+        //         }
+        //         else
+        //         {
+        //             int subBatchCount = Mathf.CeilToInt(batchSize / batchLimit);
+        //             for (int k = 0; k < subBatchCount; k++)
+        //             {
+        //                 cullingShader.SetInt("_batchOffset", memoryOffset + k * (int)batchLimit);
+        //                 float current = (batchSize < (k + 1) * (int)batchLimit)
+        //                     ? batchSize - k * (int)batchLimit
+        //                     : batchLimit;
+        //                 cullingShader.Dispatch(0, Mathf.CeilToInt(current / threadCount), 1, 1);
+        //                 dispatchCount++;
+        //             }
+        //         }
+        //     }
+        // } else
         {
-            var dispatchCount = 0;
-            for (int i = 0; i < _visibleCells.Length; i++)
-            {
-                int targetCellFlattenID = _visibleCells[i];
-                int memoryOffset = 0;
-                for (int j = 0; j < targetCellFlattenID; j++)
-                {
-                    memoryOffset += cellMatrices[j].Count;
-                }
-                
-                int batchSize = cellMatrices[targetCellFlattenID].Count;
-                
-                while (i < _visibleCells.Length - 1 && _visibleCells[i + 1] == _visibleCells[i] + 1)
-                {
-                    batchSize += cellMatrices[_visibleCells[i + 1]].Count;
-                    i++;
-                }
-                
-                if (batchSize < batchLimit)
-                {
-                    cullingShader.SetInt("_batchOffset", memoryOffset);
-                    cullingShader.Dispatch(0, Mathf.CeilToInt(batchSize / threadCount), 1, 1);
-                    dispatchCount++;
-                }
-                else
-                {
-                    int subBatchCount = Mathf.CeilToInt(batchSize / batchLimit);
-                    for (int k = 0; k < subBatchCount; k++)
-                    {
-                        cullingShader.SetInt("_batchOffset", memoryOffset + k * (int)batchLimit);
-                        float current = (batchSize < (k + 1) * (int)batchLimit)
-                            ? batchSize - k * (int)batchLimit
-                            : batchLimit;
-                        cullingShader.Dispatch(0, Mathf.CeilToInt(current / threadCount), 1, 1);
-                        dispatchCount++;
-                    }
-                }
-            }
-        } else {
             int subBatchCount = Mathf.CeilToInt(voxelCacheSize / batchLimit);
             for (int i = 0; i < subBatchCount; i++)
             {
