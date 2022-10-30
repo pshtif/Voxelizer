@@ -37,8 +37,8 @@ Shader "BinaryEgo/VoxelInstancedIndirect"
             
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            // #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            // #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile _ _SHADOWS_SOFT
             
             #pragma multi_compile _ ENABLE_CULLING
@@ -159,8 +159,8 @@ Shader "BinaryEgo/VoxelInstancedIndirect"
             
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            //#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            //#pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile _ _SHADOWS_SOFT
 
             #pragma multi_compile _ ENABLE_BILLBOARD
@@ -180,6 +180,7 @@ Shader "BinaryEgo/VoxelInstancedIndirect"
 
             CBUFFER_START(UnityPerMaterial)
                 float2 _BoundSize;
+            float _VoxelScale;
 
                 StructuredBuffer<float4> _colorBuffer;
                 StructuredBuffer<float4x4> _matrixBuffer;
@@ -196,7 +197,7 @@ Shader "BinaryEgo/VoxelInstancedIndirect"
                 float4x4 instanceMatrix = _matrixBuffer[instanceID];
 #endif
                 
-                float4 position = IN.positionOS;
+                float4 position = float4(IN.positionOS.x*_VoxelScale, IN.positionOS.y*_VoxelScale, IN.positionOS.z*_VoxelScale, IN.positionOS.w);
 
 #if ENABLE_BILLBOARD
                 float4x4 v = unity_WorldToCamera;
@@ -215,9 +216,7 @@ Shader "BinaryEgo/VoxelInstancedIndirect"
 #else
                 float3 positionWS = mul(instanceMatrix, position).xyz;
 #endif
-                
-                
-                
+                                
                 OUT.positionCS = TransformWorldToHClip(positionWS);
 
                 return OUT;
