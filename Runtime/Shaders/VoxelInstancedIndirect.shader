@@ -148,7 +148,6 @@ Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
             ZWrite On 
             ZTest LEqual
             ColorMask 0
-            Cull Back
 
             HLSLPROGRAM
             #pragma target 3.0
