@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace BinaryEgo.Voxelizer
 {
-    public class DMeshUtils
+    public class Geome3Utils
     {
         public static Mesh DMeshToUnityMesh(DMesh3 p_mesh, MeshTopology p_topology = MeshTopology.Triangles, bool p_allowLargeMeshes = true, bool p_recalcNormalsIfMissing = true)
         {
