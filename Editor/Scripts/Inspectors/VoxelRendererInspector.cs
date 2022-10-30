@@ -60,13 +60,15 @@ namespace BinaryEgo.Voxelizer.Editor
             voxelRenderer.voxelMeshType =
                 (VoxelMeshType)EditorGUILayout.EnumPopup("Voxel Mesh Type", voxelRenderer.voxelMeshType);
 
-            if (voxelRenderer.voxelMeshType == VoxelMeshType.CUSTOM)
+            switch (voxelRenderer.voxelMeshType)
             {
-                voxelRenderer.customVoxelMesh =
-                    (Mesh)EditorGUILayout.ObjectField(new GUIContent("Voxel Mesh"), voxelRenderer.customVoxelMesh,
-                        typeof(Mesh), false);
+                case VoxelMeshType.CUSTOM:
+                    voxelRenderer.customVoxelMesh =
+                        (Mesh)EditorGUILayout.ObjectField(new GUIContent("Voxel Mesh"), voxelRenderer.customVoxelMesh,
+                            typeof(Mesh), false);
+                    break;
             }
-            
+
             voxelRenderer.voxelMaterial =
                 (Material)EditorGUILayout.ObjectField(new GUIContent("Voxel Material"), voxelRenderer.voxelMaterial,
                     typeof(Material), false);
