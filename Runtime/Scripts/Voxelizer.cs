@@ -112,7 +112,7 @@ namespace BinaryEgo.Voxelizer
             
             Material[] materials = p_meshRenderer.sharedMaterials.ToArray();
 
-            DMesh3 dmesh = DMeshUtils.UnityMeshToDMesh(mesh, false);
+            DMesh3 dmesh = Geome3Utils.UnityMeshToDMesh(mesh, false);
             dmesh.name = mesh.name;
 
             int cellCount = voxelDensity;
@@ -225,7 +225,7 @@ namespace BinaryEgo.Voxelizer
                 var go = new GameObject("VoxelizedMesh");
                 go.transform.parent = p_meshRenderer.transform;
                 var outputFilter = go.AddComponent<MeshFilter>();
-                outputFilter.sharedMesh = DMeshUtils.DMeshToUnityMesh(outputMesh);
+                outputFilter.sharedMesh = Geome3Utils.DMeshToUnityMesh(outputMesh);
             }
         }
 
