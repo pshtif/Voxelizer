@@ -2,7 +2,7 @@
  *	Created by:  Peter @sHTiF Stefcek
  */
 
-Shader "BinaryEgo/VoxelInstancedIndirect"
+Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
 {
     Properties
     {
