@@ -1,6 +1,13 @@
 # Voxelizer
 Voxelizer is a tool for in-game and in-editor mesh voxelization and rendering.
 
+## TUTORIALS / DEVLOG
+* Tutorials and devlog videos for Dash framework can be found on YouTube
+
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/ymgKUqYEXpM/0.jpg)](https://www.youtube.com/watch?v=ymgKUqYEXpM&list=PLI2aUZL_-RsXKwbJjsHV8WDpruaIHkMvF&index=1 "Voxelizer Playlist")
+
+Youtube playlist: https://www.youtube.com/playlist?list=PLI2aUZL_-RsXKwbJjsHV8WDpruaIHkMvF
+
 ## Licensing
 
 For license information read here [LICENSE](LICENSE.md)
