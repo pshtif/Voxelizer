@@ -1738,7 +1738,7 @@ MonoBehaviour:
       m_Top: 0
       m_Bottom: 0
     m_Font: {fileID: 0}
-    m_FontSize: 24
+    m_FontSize: 20
     m_FontStyle: 1
     m_Alignment: 0
     m_WordWrap: 0
@@ -2464,7 +2464,7 @@ MonoBehaviour:
       m_Top: 0
       m_Bottom: 0
     m_Font: {fileID: 0}
-    m_FontSize: 13
+    m_FontSize: 12
     m_FontStyle: 1
     m_Alignment: 4
     m_WordWrap: 0

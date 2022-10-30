@@ -60,7 +60,7 @@ namespace BinaryEgo.Voxelizer.Editor
         {
             var voxelizer = (target as Voxelizer);
             
-            if (!GUIUtils.DrawMinimizableSectionTitle("SOURCE SETTINGS: ", ref voxelizer.sourceSectionMinimized))
+            if (!GUIUtils.DrawMinimizableSectionTitle("SOURCE SETTINGS", ref voxelizer.sourceSectionMinimized))
                 return;
             
             voxelizer.sourceTransform =
@@ -80,7 +80,7 @@ namespace BinaryEgo.Voxelizer.Editor
         {
             var voxelizer = (target as Voxelizer);
 
-            if (!GUIUtils.DrawMinimizableSectionTitle("VOXEL SETTINGS: ", ref voxelizer.voxelSectionMinimized))
+            if (!GUIUtils.DrawMinimizableSectionTitle("VOXEL SETTINGS", ref voxelizer.voxelSectionMinimized))
                 return;
             
             GUI.enabled = voxelizer.sourceTransform != null;
@@ -123,7 +123,7 @@ namespace BinaryEgo.Voxelizer.Editor
         {
             var voxelizer = (target as Voxelizer);
 
-            if (!GUIUtils.DrawMinimizableSectionTitle("ADDITIONAL SETTINGS: ", ref voxelizer.additionalSectionMinimized))
+            if (!GUIUtils.DrawMinimizableSectionTitle("ADDITIONAL SETTINGS", ref voxelizer.additionalSectionMinimized))
                 return;
             
             voxelizer.generateMesh = EditorGUILayout.Toggle("Generate Unity Mesh", voxelizer.generateMesh);
