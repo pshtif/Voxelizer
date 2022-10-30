@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using BinaryEgo.Voxelizer;
 using Unity.Collections;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 public enum VoxelMeshType
@@ -622,8 +620,8 @@ public class VoxelRenderer : MonoBehaviour
     {
         if (Application.isPlaying || !enabled)
             return;
-
-        var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+        
+        var prefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
         if (prefabStage == null || prefabStage.IsPartOfPrefabContents(this.gameObject))
         {
             Render(p_sceneView.camera);    
