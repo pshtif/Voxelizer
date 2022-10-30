@@ -249,13 +249,13 @@ namespace BinaryEgo.Voxelizer
             voxGen.voxelSize = (float)p_voxelSize;
             voxGen.voxelOffset = p_voxelOffset;
             voxGen.Voxels = p_bitmap;
-            if (p_sampleColor && CheckTextureReadability(p_materials))
+            if (p_sampleColor && VoxelUtils.CheckTextureReadability(p_materials))
             {
                 voxGen.ColorSourceF = (idx) =>
                 {
                     Vector3d point = p_indexer.FromGrid(idx) + p_voxelOffset;
                     int t = p_spatial.FindNearestTriangle(point);
-                    return GetColorAtPoint(p_mesh, t, point, p_materials,
+                    return VoxelUtils.GetColorAtPoint(p_mesh, t, point, p_materials,
                         p_interpolateColorSampling);
                 };
                 
@@ -275,14 +275,14 @@ namespace BinaryEgo.Voxelizer
             DMesh3 p_mesh, ShiftGridIndexer3 p_indexer, DMeshAABBTree3 p_spatial, Material[] p_materials,
             bool p_interpolateUV)
         {
-
-            Vector4[] colorBuffer = new Vector4[p_bitmap.NonZeros().Count()];
+            var voxels = p_bitmap.NonZeros();
+            Vector4[] colorBuffer = new Vector4[voxels.Count()];
             int i = 0;
-            foreach (var voxel in p_bitmap.NonZeros())
+            foreach (var voxel in voxels)
             {
                 Vector3d point = p_indexer.FromGrid(voxel) + p_voxelOffset;
                 int t = p_spatial.FindNearestTriangle(point);
-                colorBuffer[i++] = GetColorAtPoint(p_mesh, t, point, p_materials, p_interpolateUV);
+                colorBuffer[i++] = VoxelUtils.GetColorAtPoint(p_mesh, t, point, p_materials, p_interpolateUV);
             }
 
             return colorBuffer;
@@ -332,21 +332,6 @@ namespace BinaryEgo.Voxelizer
 
             return bitmap;
         }
-        
-        public static Vector2 GetInterpolatedUVInTriangle(Vector3d p_p1, Vector3d p_p2, Vector3d p_p3, Vector3d p_point, Vector2 p_uv1,
-            Vector2 p_uv2, Vector2 p_uv3)
-        {
-            var d1 = p_p1 - p_point;
-            var d2 = p_p2 - p_point;
-            var d3 = p_p3 - p_point;
-
-            double a = Vector3d.Cross(p_p1 - p_p2, p_p1 - p_p3).Length;
-            float a1 = (float) (Vector3d.Cross(d2, d3).Length / a);
-            float a2 = (float) (Vector3d.Cross(d3, d1).Length / a);
-            float a3 = (float) (Vector3d.Cross(d1, d2).Length / a);
-            
-            return p_uv1 * a1 + p_uv2 * a2 + p_uv3 * a3;
-        }
 
         void OnProgress(string p_title, string p_info, float p_progress)
         {
@@ -361,114 +346,6 @@ namespace BinaryEgo.Voxelizer
             #if UNITY_EDITOR
             EditorUtility.ClearProgressBar();
             #endif
-        }
-        
-        public static Color GetInterpolatedColorInTriangle(Vector3d p_p1, Vector3d p_p2, Vector3d p_p3, Vector3d p_point, Vector3f p_color1,
-            Vector3f p_color2, Vector3f p_color3)
-        {
-            var d1 = p_p1 - p_point;
-            var d2 = p_p2 - p_point;
-            var d3 = p_p3 - p_point;
-
-            double a = Vector3d.Cross(p_p1 - p_p2, p_p1 - p_p3).Length;
-            float a1 = (float) (Vector3d.Cross(d2, d3).Length / a);
-            float a2 = (float) (Vector3d.Cross(d3, d1).Length / a);
-            float a3 = (float) (Vector3d.Cross(d1, d2).Length / a);
-            
-            return p_color1 * a1 + p_color2 * a2 + p_color3 * a3;
-        }
-
-        public bool CheckTextureReadability(Material[] p_materials)
-        {
-            var valid = true;
-            foreach (var material in p_materials)
-            {
-                if (material.mainTexture != null)
-                {
-                    if (!material.mainTexture.isReadable)
-                    {
-                        Debug.LogWarning("Texture " + material.mainTexture.name +
-                                         " is not readable cannot voxelize with color sampling.");
-                        valid = false;
-                    }
-                }
-            }
-
-            return valid;
-        }
-
-        public static Color GetColorAtPoint(DMesh3 p_mesh, int p_triangleIndex, Vector3d p_point,
-            Material[] p_materials, bool p_interpolate)
-        {
-            if (p_triangleIndex == DMesh3.InvalidID)
-                return Color.black;
-
-            DistPoint3Triangle3 dist = MeshQueries.TriangleDistance(p_mesh, p_triangleIndex, p_point);
-            Vector3d nearestPoint = dist.TriangleClosest;
-            Index3i ti = p_mesh.GetTriangle(p_triangleIndex);
-
-            Color texColor = Color.white;
-            
-            if (p_materials != null)
-            {
-                int materialGroup = p_mesh.GetMaterialGroup(p_triangleIndex);
-
-                if (materialGroup < p_materials.Length)
-                {
-                    var texture = (Texture2D)p_materials[materialGroup].mainTexture;
-
-                    if (texture != null)
-                    {
-                        if (texture.isReadable)
-                        {
-                            Vector2d uv;
-                            if (p_interpolate)
-                            {
-                                uv = GetInterpolatedUVInTriangle(
-                                    p_mesh.GetVertex(ti[0]),
-                                    p_mesh.GetVertex(ti[1]),
-                                    p_mesh.GetVertex(ti[2]),
-                                    nearestPoint,
-                                    p_mesh.GetVertexUV(ti[0]),
-                                    p_mesh.GetVertexUV(ti[1]),
-                                    p_mesh.GetVertexUV(ti[2]));
-                            }
-                            else
-                            {
-                                uv = p_mesh.GetVertexUV(ti[0]);
-                            }
-                            
-                            texColor = texture.GetPixelBilinear((float)uv.x, (float)uv.y);
-                        }
-                        else
-                        {
-                            texColor = Color.white;
-                        }
-                    }
-                }
-            }
-
-            Color vertexColor = Color.white;
-            if (p_mesh.HasVertexColors)
-            {
-                if (p_interpolate)
-                {
-                    vertexColor = GetInterpolatedColorInTriangle(
-                        p_mesh.GetVertex(ti[0]),
-                        p_mesh.GetVertex(ti[1]),
-                        p_mesh.GetVertex(ti[2]),
-                        nearestPoint,
-                        p_mesh.GetVertexColor(ti[0]),
-                        p_mesh.GetVertexColor(ti[1]),
-                        p_mesh.GetVertexColor(ti[2]));
-                }
-                else
-                {
-                    vertexColor = p_mesh.GetVertexColor(ti[0]);
-                }
-            }
-            
-            return texColor * vertexColor;
         }
     }
 }
