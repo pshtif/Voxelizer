@@ -117,6 +117,8 @@ namespace BinaryEgo.Voxelizer.Editor
                 voxelizer.enableVoxelCache = EditorGUILayout.Toggle("Enable Voxel Cache", voxelizer.enableVoxelCache);
                 GUI.enabled = true;
             }
+
+            voxelizer.enableColorSampling = EditorGUILayout.Toggle("Enable Color Sampling", voxelizer.enableColorSampling);
         }
 
         public void DrawAdditionalSection()
