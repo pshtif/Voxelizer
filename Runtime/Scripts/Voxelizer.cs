@@ -4,7 +4,6 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using g3;
 using UnityEditor;
@@ -160,18 +159,18 @@ namespace BinaryEgo.Voxelizer
                 {
                     case VoxelizationType.SDF:
                         voxelOffset = -Vector3d.One * voxelSize * 2;
-                        bitmap = VoxelizeMeshUsingSDF(dmesh, spatial, indexer, voxelSize, enableColorSampling, interpolateColorSampling);
+                        bitmap = VoxelUtils.VoxelizeMeshUsingSDF(dmesh, spatial, indexer, voxelSize, enableColorSampling, interpolateColorSampling);
                         finalOffset = (Vector3)dmesh.CachedBounds.Min - voxelSize * 2f * Vector3.one;
                         break;
                     case VoxelizationType.GRID:
                         voxelOffset = Vector3d.One * voxelSize/2;
-                        bitmap = VoxelizeMeshUsingGrid(dmesh, spatial, indexer, voxelSize, enableColorSampling,
+                        bitmap = VoxelUtils.VoxelizeMeshUsingGrid(dmesh, spatial, indexer, voxelSize, enableColorSampling,
                             interpolateColorSampling,  voxelDims);
                         finalOffset = (Vector3)dmesh.CachedBounds.Min + voxelSize/2 * Vector3.one;
                         break;
                     default:
                         voxelOffset = Vector3d.One * voxelSize/2;
-                        bitmap = VoxelizeMeshUsingWinding(dmesh, spatial, indexer, voxelSize, enableColorSampling,
+                        bitmap = VoxelUtils.VoxelizeMeshUsingWinding(dmesh, spatial, indexer, voxelSize, enableColorSampling,
                             interpolateColorSampling, voxelDims);
                         finalOffset = (Vector3)dmesh.CachedBounds.Min + voxelSize/2 * Vector3.one;
                         break;
@@ -286,51 +285,6 @@ namespace BinaryEgo.Voxelizer
             }
 
             return colorBuffer;
-        }
-
-        Bitmap3 VoxelizeMeshUsingSDF(DMesh3 p_mesh, DMeshAABBTree3 p_spatial, ShiftGridIndexer3 p_indexer, double p_voxelSize, bool p_sampleColor, bool p_interpolateUV)
-        {
-            MeshSignedDistanceGrid sdf = new MeshSignedDistanceGrid(p_mesh, p_voxelSize, p_spatial);
-            sdf.Compute();
-
-            Bitmap3 bitmap = new Bitmap3(sdf.Dimensions);
-            
-            foreach(Vector3i idx in bitmap.Indices()) {
-                float f = sdf[idx.x, idx.y, idx.z];
-                bitmap.Set(idx, f < 0);
-            }
-
-            return bitmap;
-        }
-
-        Bitmap3 VoxelizeMeshUsingGrid(DMesh3 p_mesh, DMeshAABBTree3 p_spatial, ShiftGridIndexer3 p_indexer, double p_voxelSize, bool p_sampleColor, bool p_interpolateUV, Vector3i p_voxelDims)
-        {
-            Bitmap3 bitmap = new Bitmap3(p_voxelDims);
-            Vector3d voxelOffset = Vector3d.One * p_voxelSize/2;
-            
-            //foreach (Vector3i idx in bitmap.Indices())
-            gParallel.ForEach(bitmap.Indices(), (idx) =>
-            {
-                Vector3d v = p_indexer.FromGrid(idx) + voxelOffset;
-                bitmap.SafeSet(idx, p_spatial.IsInside(v));
-            });
-
-            return bitmap;
-        }
-
-        Bitmap3 VoxelizeMeshUsingWinding(DMesh3 p_mesh, DMeshAABBTree3 p_spatial, ShiftGridIndexer3 p_indexer, double p_voxelSize, bool p_sampleColor, bool p_interpolateUV,  Vector3i p_voxelDims)
-        {
-            p_spatial.WindingNumber(Vector3d.Zero); 
-            
-            Bitmap3 bitmap = new Bitmap3(p_voxelDims);
-            Vector3d voxelOffset = Vector3d.One * p_voxelSize/2;
-            gParallel.ForEach(bitmap.Indices(), (idx) =>
-            {
-                Vector3d v = p_indexer.FromGrid(idx) + voxelOffset;
-                bitmap.SafeSet(idx, p_spatial.WindingNumber(v) > 0.5);
-            });
-
-            return bitmap;
         }
 
         void OnProgress(string p_title, string p_info, float p_progress)

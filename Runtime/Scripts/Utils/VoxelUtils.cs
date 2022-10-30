@@ -131,5 +131,50 @@ namespace BinaryEgo.Voxelizer
 
             return valid;
         }
+        
+        public static Bitmap3 VoxelizeMeshUsingSDF(DMesh3 p_mesh, DMeshAABBTree3 p_spatial, ShiftGridIndexer3 p_indexer, double p_voxelSize, bool p_sampleColor, bool p_interpolateUV)
+        {
+            MeshSignedDistanceGrid sdf = new MeshSignedDistanceGrid(p_mesh, p_voxelSize, p_spatial);
+            sdf.Compute();
+
+            Bitmap3 bitmap = new Bitmap3(sdf.Dimensions);
+            
+            foreach(Vector3i idx in bitmap.Indices()) {
+                float f = sdf[idx.x, idx.y, idx.z];
+                bitmap.Set(idx, f < 0);
+            }
+
+            return bitmap;
+        }
+
+        public static Bitmap3 VoxelizeMeshUsingGrid(DMesh3 p_mesh, DMeshAABBTree3 p_spatial, ShiftGridIndexer3 p_indexer, double p_voxelSize, bool p_sampleColor, bool p_interpolateUV, Vector3i p_voxelDims)
+        {
+            Bitmap3 bitmap = new Bitmap3(p_voxelDims);
+            Vector3d voxelOffset = Vector3d.One * p_voxelSize/2;
+            
+            //foreach (Vector3i idx in bitmap.Indices())
+            gParallel.ForEach(bitmap.Indices(), (idx) =>
+            {
+                Vector3d v = p_indexer.FromGrid(idx) + voxelOffset;
+                bitmap.SafeSet(idx, p_spatial.IsInside(v));
+            });
+
+            return bitmap;
+        }
+
+        public static Bitmap3 VoxelizeMeshUsingWinding(DMesh3 p_mesh, DMeshAABBTree3 p_spatial, ShiftGridIndexer3 p_indexer, double p_voxelSize, bool p_sampleColor, bool p_interpolateUV,  Vector3i p_voxelDims)
+        {
+            p_spatial.WindingNumber(Vector3d.Zero); 
+            
+            Bitmap3 bitmap = new Bitmap3(p_voxelDims);
+            Vector3d voxelOffset = Vector3d.One * p_voxelSize/2;
+            gParallel.ForEach(bitmap.Indices(), (idx) =>
+            {
+                Vector3d v = p_indexer.FromGrid(idx) + voxelOffset;
+                bitmap.SafeSet(idx, p_spatial.WindingNumber(v) > 0.5);
+            });
+
+            return bitmap;
+        }
     }
 }
