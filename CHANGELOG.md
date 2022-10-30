@@ -4,18 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## RELEASE CANDIDATES
 
-### Release 0.1.2
+### Release 0.2.0
 
 #### Added
 
 - added transform to mesh baking
 - added transform to voxel invalidation
 - added multi object voxelization
+- added more clean inspector UI
+- added layer support for sources
+- added direct render/material settings invalidation
+- added initial support for transparent material
 
 #### Changed
 
 - changed optimizations on invalidation jobs
 - changed inspector UI changes
+- changed disable CPU precull for now
 
 ### Release 0.1.1 - 24.10.2022
 

@@ -14,7 +14,7 @@ namespace BinaryEgo.Voxelizer
 {
     public class Voxelizer : MonoBehaviour
     {
-        public static string VERSION = "0.1.2";
+        public static string VERSION = "0.2.0";
         
         #if UNITY_EDITOR
         public bool sourceSectionMinimized = false;
