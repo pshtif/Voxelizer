@@ -72,7 +72,7 @@ public class VoxelMesh
         _initialized = true;
     }
     
-    public VoxelMesh(IBinaryVoxelGrid p_voxelGrid, Vector4[] p_colors, Transform p_transform, AxisAlignedBox3d p_bounds, bool p_generateInside, float p_voxelSize, VoxelBakeTransform p_voxelBakeTransform)
+    public VoxelMesh(IBinaryVoxelGrid p_voxelGrid, Vector4[] p_colors, Transform p_transform, AxisAlignedBox3d p_bounds, Vector3 p_offset, bool p_generateInside, float p_voxelSize, VoxelBakeTransform p_voxelBakeTransform)
     {
         _transform = p_transform;
         _voxelSize = p_voxelSize;
@@ -96,10 +96,7 @@ public class VoxelMesh
         // }
         // else
         {
-            //var bounds = mesh.CachedBounds;
-            var offset = (Vector3)p_bounds.Min - _voxelSize * 2f * Vector3.one;
-            //Vector4[] colors = p_machina.cachedOutput.GetAttribute<Vector4[]>("colorBuffer");
-            
+
             //_vertices = new NativeList<Vector3>(Allocator.Persistent);
             _matrices = new NativeList<Matrix4x4>(Allocator.Persistent);
             this._colors = new NativeList<Vector4>(Allocator.Persistent);
@@ -111,7 +108,7 @@ public class VoxelMesh
                 if (p_generateInside || !IsInside(p_voxelGrid, voxelPosition))
                 {
                     var position = new Vector3(voxelPosition.x, voxelPosition.y, voxelPosition.z) *_voxelSize  +
-                               offset;
+                               p_offset;
                     _matrices.Add(Matrix4x4.TRS(position, Quaternion.identity, Vector3.one * _voxelSize));
                     //_vertices.Add(new Vector3(nz.x, nz.y, nz.z) * voxelSize + offset);
 
