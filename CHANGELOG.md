@@ -4,7 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## RELEASE CANDIDATES
 
-### Release 0.2.0
+### Release 0.3.0
+
+#### Added
+
+- added option to enable/disable color sampling during voxelization
+
+#### Fixed
+
+- fixed final offset issue for GRID/WINDING algorithms
+
+### Release 0.2.0 - 30.10.2022
 
 #### Added
 
