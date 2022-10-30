@@ -12,9 +12,9 @@ namespace Plugins.Voxelizer.Editor.Scripts
         
         public static bool DrawMinimizableSectionTitle(string p_title, ref bool p_minimized)
         {
-            GUILayout.Label(p_title, Skin.GetStyle("section_title"), GUILayout.Height(28));
+            GUILayout.Label(p_title, Skin.GetStyle("section_title"), GUILayout.Height(26));
             var rect = GUILayoutUtility.GetLastRect();
-            GUI.Label(new Rect(rect.x+rect.width- (p_minimized ? 24 : 21), rect.y-2, 24, 24), p_minimized ? "+" : "-", Skin.GetStyle("minimizebuttonbig"));
+            GUI.Label(new Rect(rect.x+rect.width- (p_minimized ? 24 : 21), rect.y, 24, 24), p_minimized ? "+" : "-", Skin.GetStyle("minimizebuttonbig"));
             
             if (GUI.Button(new Rect(rect.x, rect.y, rect.width, rect.height), "", GUIStyle.none))
             {

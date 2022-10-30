@@ -23,7 +23,7 @@ namespace BinaryEgo.Voxelizer.Editor
 
             EditorGUI.BeginChangeCheck();
 
-            GUILayout.Space(2);
+            GUILayout.Space(4);
             
             DrawSourceSection();
             
@@ -106,7 +106,17 @@ namespace BinaryEgo.Voxelizer.Editor
             
             voxelizer.voxelBakeTransform = (VoxelBakeTransform)EditorGUILayout.EnumPopup("Voxel Bake Transform", voxelizer.voxelBakeTransform);
 
-            voxelizer.enableVoxelCache = EditorGUILayout.Toggle("Enable Voxel Cache", voxelizer.enableVoxelCache);
+            if (voxelizer.voxelBakeTransform == VoxelBakeTransform.NONE)
+            {
+                voxelizer.enableVoxelCache = EditorGUILayout.Toggle("Enable Voxel Cache", voxelizer.enableVoxelCache);
+            }
+            else
+            {
+                GUI.enabled = false;
+                voxelizer.enableVoxelCache = false;
+                voxelizer.enableVoxelCache = EditorGUILayout.Toggle("Enable Voxel Cache", voxelizer.enableVoxelCache);
+                GUI.enabled = true;
+            }
         }
 
         public void DrawAdditionalSection()
