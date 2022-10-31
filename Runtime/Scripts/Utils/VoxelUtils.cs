@@ -176,5 +176,38 @@ namespace BinaryEgo.Voxelizer
 
             return bitmap;
         }
+        
+        public static bool IsInside(IBinaryVoxelGrid p_grid, Vector3i p_index)
+        {
+            AxisAlignedBox3i bounds = p_grid.GridBounds;
+            bounds.Max -= Vector3i.One;
+        
+            Vector3i n = new Vector3i(p_index.x + 1, p_index.y, p_index.z);
+            if (!bounds.Contains(n) || !p_grid.Get(n))
+                return false;
+            n = new Vector3i(p_index.x - 1, p_index.y, p_index.z);
+            if (!bounds.Contains(n) || !p_grid.Get(n))
+                return false;
+            n = new Vector3i(p_index.x, p_index.y + 1, p_index.z);
+            if (!bounds.Contains(n) || !p_grid.Get(n))
+                return false;
+            n = new Vector3i(p_index.x, p_index.y - 1, p_index.z);
+            if (!bounds.Contains(n) || !p_grid.Get(n))
+                return false;
+            n = new Vector3i(p_index.x, p_index.y, p_index.z + 1);
+            if (!bounds.Contains(n) || !p_grid.Get(n))
+                return false;
+            n = new Vector3i(p_index.x, p_index.y, p_index.z - 1);
+            if (!bounds.Contains(n) || !p_grid.Get(n))
+                return false;
+
+            return true;
+        }
+        
+        // public static void Copy<T>(NativeArray<T> dest, int destIdx, NativeArray<T> src, int srcIdx, int count)
+        //     where T : struct
+        // {
+        //     dest.Slice(destIdx, count).CopyFrom(src.Slice(srcIdx, count));
+        // }
     }
 }
