@@ -13,7 +13,7 @@ Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
         [Toggle(ENABLE_CULLING)]_EnableCulling("Enable Culling", Float) = 0
         [Toggle(ENABLE_TEXTURE)]_EnableTexture("Enable Texture", Float) = 0
         [Toggle(ENABLE_BILLBOARD)] _EnableBillboard ("Enable Billboard", Float) = 0
-        [HideInInspector]_BoundSize("_BoundSize", Vector) = (1,1,0)
+        //[HideInInspector]_BoundSize("_BoundSize", Vector) = (1,1,0)
     }
 
     SubShader
