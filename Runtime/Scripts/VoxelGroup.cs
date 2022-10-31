@@ -13,6 +13,7 @@ namespace BinaryEgo.Voxelizer
     [Serializable]
     public class VoxelGroup
     {
+        [SerializeField]
         private List<VoxelMesh> _voxelMeshes = new List<VoxelMesh>();
 
         public void AddMesh(VoxelMesh p_voxelMesh)
@@ -23,30 +24,16 @@ namespace BinaryEgo.Voxelizer
         public void Invalidate(ComputeBuffer p_transformBuffer, NativeArray<Matrix4x4> p_matrixArray,
             ComputeBuffer p_colorBuffer, NativeArray<Vector4> p_colorArray, ref int p_indexOffset)
         {
-            if (_voxelMeshes == null)
-                return;
-
             foreach (VoxelMesh voxelMesh in _voxelMeshes)
             {
-                if (voxelMesh.IsInitialized)
-                {
-                    voxelMesh.Invalidate(p_transformBuffer, p_matrixArray, p_colorBuffer, p_colorArray, p_indexOffset);
-                    p_indexOffset += voxelMesh.voxelIndices.Length;
-                }
+                voxelMesh.Invalidate(p_transformBuffer, p_matrixArray, p_colorBuffer, p_colorArray, p_indexOffset);
+                p_indexOffset += voxelMesh.VoxelCount;
             }
         }
 
         public void Dispose()
         {
-            if (_voxelMeshes == null)
-                return;
-
-            foreach (VoxelMesh mesh in _voxelMeshes)
-            {
-                mesh.Dispose();
-            }
-
-            _voxelMeshes = null;
+            _voxelMeshes?.ForEach(vm => vm.Dispose());
         }
     }
 }
