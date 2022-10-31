@@ -14,6 +14,9 @@ namespace BinaryEgo.Voxelizer.Editor
     {
         public static GUISkin Skin => (GUISkin)Resources.Load("Skins/VoxelizerEditorSkin");
         
+        private Voxelizer voxelizer => (target as Voxelizer);
+
+        
         public override void OnInspectorGUI()
         {
             var voxelizer = (target as Voxelizer);
@@ -41,8 +44,7 @@ namespace BinaryEgo.Voxelizer.Editor
             {
                 if (voxelizer.autoVoxelize)
                 {
-                    voxelizer.Voxelize();
-                    SceneView.lastActiveSceneView?.Repaint();
+                    Voxelize();
                 }
             }
 
@@ -50,16 +52,21 @@ namespace BinaryEgo.Voxelizer.Editor
             
             if (GUIUtils.DrawButton("VOXELIZE"))
             {
-                voxelizer.Voxelize();
+                Voxelize();
             }
 
             GUI.color = Color.white;
         }
 
+        private void Voxelize()
+        {
+            voxelizer.Voxelize();
+            EditorUtility.SetDirty(voxelizer);
+            SceneView.lastActiveSceneView?.Repaint();
+        }
+
         public void DrawSourceSection()
         {
-            var voxelizer = (target as Voxelizer);
-            
             if (!GUIUtils.DrawMinimizableSectionTitle("SOURCE SETTINGS", ref voxelizer.sourceSectionMinimized))
                 return;
             
@@ -78,8 +85,6 @@ namespace BinaryEgo.Voxelizer.Editor
 
         public void DrawVoxelSection()
         {
-            var voxelizer = (target as Voxelizer);
-
             if (!GUIUtils.DrawMinimizableSectionTitle("VOXEL SETTINGS", ref voxelizer.voxelSectionMinimized))
                 return;
             
@@ -104,9 +109,9 @@ namespace BinaryEgo.Voxelizer.Editor
                     break;
             }
             
-            voxelizer.voxelBakeTransform = (VoxelBakeTransform)EditorGUILayout.EnumPopup("Voxel Bake Transform", voxelizer.voxelBakeTransform);
+            voxelizer.voxelTransformBakeType = (VoxelTransformBakeType)EditorGUILayout.EnumPopup("Voxel Bake Transform", voxelizer.voxelTransformBakeType);
 
-            if (voxelizer.voxelBakeTransform == VoxelBakeTransform.NONE)
+            if (voxelizer.voxelTransformBakeType == VoxelTransformBakeType.NONE)
             {
                 voxelizer.enableVoxelCache = EditorGUILayout.Toggle("Enable Voxel Cache", voxelizer.enableVoxelCache);
             }
