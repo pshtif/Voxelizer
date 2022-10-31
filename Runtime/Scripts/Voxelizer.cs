@@ -34,7 +34,7 @@ namespace BinaryEgo.Voxelizer
         public int voxelDensity = 20;
         
         public VoxelizationType voxelizationType = VoxelizationType.SDF;
-        public VoxelBakeTransform voxelBakeTransform = VoxelBakeTransform.NONE;
+        public VoxelTransformBakeType voxelTransformBakeType = VoxelTransformBakeType.NONE;
         public bool enableColorSampling = true;
         public bool interpolateColorSampling = true;
         public bool enableVoxelCache = true;
@@ -52,7 +52,7 @@ namespace BinaryEgo.Voxelizer
             _voxelColorCache?.Clear();
             VoxelRenderer.Instance.RemoveAllGroups();
             // Cache for baked transforms not implemented yet
-            enableVoxelCache = enableVoxelCache && voxelBakeTransform == VoxelBakeTransform.NONE;
+            enableVoxelCache = enableVoxelCache && voxelTransformBakeType == VoxelTransformBakeType.NONE;
             
             if (sourceTransform == null)
                 return;
@@ -83,7 +83,7 @@ namespace BinaryEgo.Voxelizer
                 return;
 
             Mesh mesh;
-            if (voxelBakeTransform == VoxelBakeTransform.NONE)
+            if (voxelTransformBakeType == VoxelTransformBakeType.NONE)
             {
                 mesh = filter.sharedMesh;
             }
@@ -91,12 +91,12 @@ namespace BinaryEgo.Voxelizer
             {
                 mesh = Instantiate(filter.sharedMesh);
                 var matrix = p_meshRenderer.transform.localToWorldMatrix;
-                switch (voxelBakeTransform)
+                switch (voxelTransformBakeType)
                 {
-                    case VoxelBakeTransform.SCALE_ROTATION:
+                    case VoxelTransformBakeType.SCALE_ROTATION:
                         matrix.SetColumn(3, new Vector4(0, 0, 0, 1));
                         break;
-                    case VoxelBakeTransform.SCALE:
+                    case VoxelTransformBakeType.SCALE:
                         matrix = Matrix4x4.Scale(matrix.lossyScale);
                         break;
                 }
@@ -220,7 +220,7 @@ namespace BinaryEgo.Voxelizer
                 color = Enumerable.Repeat(Vector4.one, bitmap.NonZeros().Count()).ToArray();
             }
 
-            var voxelMesh = new VoxelMesh(bitmap, color, p_meshRenderer.transform, dmesh.CachedBounds, finalOffset, false, voxelSize, voxelBakeTransform);
+            var voxelMesh = new VoxelMesh(bitmap, color, p_meshRenderer.transform, dmesh.CachedBounds, finalOffset, false, voxelSize, voxelTransformBakeType);
             VoxelRenderer.Instance.Add(voxelMesh);
 
             if (generateMesh)
