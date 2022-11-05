@@ -13,7 +13,7 @@ Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
         [Toggle(ENABLE_CULLING)]_EnableCulling("Enable Culling", Float) = 0
         [Toggle(ENABLE_TEXTURE)]_EnableTexture("Enable Texture", Float) = 0
         [Toggle(ENABLE_BILLBOARD)] _EnableBillboard ("Enable Billboard", Float) = 0
-        [HideInInspector]_BoundSize("_BoundSize", Vector) = (1,1,0)
+        //[HideInInspector]_BoundSize("_BoundSize", Vector) = (1,1,0)
     }
 
     SubShader
@@ -103,7 +103,6 @@ Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
                 position = mul(rotationMatrixInverse, position);
 #endif
                 float3 positionWS = mul(instanceMatrix, position).xyz;
-                OUT.positionCS = TransformWorldToHClip(positionWS);
                 
                 half3 normalWS = normalize(mul(IN.normalOS, (float3x3)Inverse(instanceMatrix)));
 #if CULLING
@@ -117,12 +116,20 @@ Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
                 half3 lighting =  mainLight.color * mainLight.distanceAttenuation * mainLight.shadowAttenuation;
 #else
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(positionWS));
+                //Light mainLight = GetMainLight(TransformWorldToShadowCoord(instanceMatrix._m03_m13_m23));
                 half directDiffuse = saturate(dot(normalWS, mainLight.direction));
                 half3 lighting = mainLight.color * mainLight.distanceAttenuation * mainLight.shadowAttenuation * directDiffuse;
+
+                // float s = mainLight2.shadowAttenuation * mainLight2.shadowAttenuation;
+                // position = float4(position.x*s, position.y*s, position.z*s, position.w);
+                // positionWS = mul(instanceMatrix, position).xyz;
+                //positionWS = float3(positionWS.xyz - mainLight.direction * (1-s) * 1);
+                //positionWS = float3(positionWS.xyz - float3(0,1,0) * (1-s) * 0.5f);
 #endif
 
+                OUT.positionCS = TransformWorldToHClip(positionWS);
                 OUT.color = (lighting + _AmbientLight) * albedo;
-                OUT.texcoord    = IN.texcoord;
+                OUT.texcoord = IN.texcoord;
 
                 return OUT;
             }
@@ -144,18 +151,15 @@ Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
         Pass
         {
             Tags { "LightMode" = "ShadowCaster" }
-            
-            Cull Off
-            Blend One Zero
+
+            ZWrite On 
             ZTest LEqual
-            ZWrite On
             ColorMask 0
 
             HLSLPROGRAM
             #pragma target 3.0
             #pragma vertex vert
             #pragma fragment frag
-            #pragma shader_feature CULLING
             
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
@@ -180,7 +184,7 @@ Shader "BinaryEgo/Voxelizer/VoxelInstancedIndirect"
 
             CBUFFER_START(UnityPerMaterial)
                 float2 _BoundSize;
-            float _VoxelScale;
+                float _VoxelScale;
 
                 StructuredBuffer<float4> _colorBuffer;
                 StructuredBuffer<float4x4> _matrixBuffer;

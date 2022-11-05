@@ -4,7 +4,7 @@
 
 namespace BinaryEgo.Voxelizer
 {
-    public enum VoxelBakeTransform
+    public enum VoxelTransformBakeType
     {
         NONE,
         SCALE,
