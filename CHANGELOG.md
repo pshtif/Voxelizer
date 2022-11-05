@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 #### Added
 
 - added option to enable/disable color sampling during voxelization
+- added full support for voxel meshes serialization
 
 #### Fixed
 
