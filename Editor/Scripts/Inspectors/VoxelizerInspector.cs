@@ -2,7 +2,6 @@
  *	Created by:  Peter @sHTiF Stefcek
  */
 
-using Plugins.Voxelizer.Editor.Scripts;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;

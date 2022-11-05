@@ -5,32 +5,17 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using BinaryEgo.Voxelizer;
 using g3;
-using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.NotBurstCompatible;
 using Unity.Jobs;
-using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Jobs;
 
 namespace BinaryEgo.Voxelizer
 {
     [Serializable]
     public class VoxelMesh : ISerializationCallbackReceiver
     {
-        // public static bool IsCached(string p_name)
-        // {
-        //     return POSITION_CACHE != null ? POSITION_CACHE.ContainsKey(p_name) : false;
-        // }
-
-        // private static Dictionary<string, NativeList<Vector3>> POSITION_CACHE;
-        // private static Dictionary<string, NativeList<Vector4>> COLOR_CACHE;
-        // private static Dictionary<string, NativeList<int>> INDEX_CACHE;
-        // private static bool _cacheDisposed = false;
-
         // public bool usePhysics = false;
 
         [SerializeField] private float _voxelSize = 1;
@@ -40,10 +25,7 @@ namespace BinaryEgo.Voxelizer
         [SerializeField] private List<int> _indices = new List<int>();
         [SerializeField] private List<Matrix4x4> _matrices = new List<Matrix4x4>();
         [SerializeField] private List<Vector4> _colors = new List<Vector4>();
-
-        // public bool _usingCache = false;
-        // private string _cacheName;
-        //
+        
         // private Dictionary<Vector3i, Transform> _physicsLookup;
         // private Transform _physicsContainer;
         // private List<Transform> _physicsTransforms;
@@ -61,10 +43,13 @@ namespace BinaryEgo.Voxelizer
         private NativeList<Matrix4x4> _nativeMatrices;
         private NativeList<Vector4> _nativeColors;
 
-        public VoxelMesh(IBinaryVoxelGrid p_voxelGrid, Vector4[] p_colors, Transform p_transform,
+        public string name;
+
+        public VoxelMesh(string p_name, IBinaryVoxelGrid p_voxelGrid, Vector4[] p_colors, Transform p_transform,
             AxisAlignedBox3d p_bounds, Vector3 p_offset, bool p_generateInside, float p_voxelSize,
             VoxelTransformBakeType p_voxelTransformBakeType)
         {
+            name = p_name;
             _transform = p_transform;
             _voxelSize = p_voxelSize;
             _voxelTransformBakeType = p_voxelTransformBakeType;
@@ -89,31 +74,6 @@ namespace BinaryEgo.Voxelizer
                 colorIndex++;
             }
 
-            // int index = 0;
-            // foreach (Vector3i voxelPosition in voxels.NonZeros())
-            // {
-            //     if (p_generateInside || !IsInside(voxels, voxelPosition))
-            //     {
-            //         var body1 = _physicsLookup[voxelPosition].GetComponent<Rigidbody>();
-            //         Rigidbody body2;
-            //         Vector3i n = new Vector3i(voxelPosition.x + 1, voxelPosition.y, voxelPosition.z);
-            //         if (_physicsLookup.ContainsKey(n))
-            //         {
-            //             body2 = _physicsLookup[n].GetComponent<Rigidbody>();
-            //             VoxelRenderer.Instance.physics.AddConnection(body1, body2);
-            //         }
-            //         
-            //         n = new Vector3i(voxelPosition.x, voxelPosition.y+1, voxelPosition.z);
-            //         if (_physicsLookup.ContainsKey(n))
-            //         {
-            //             body2 = _physicsLookup[n].GetComponent<Rigidbody>();
-            //             VoxelRenderer.Instance.physics.AddConnection(body1, body2);
-            //         }
-            //         voxelIndex++;
-            //     }
-            // }
-
-
             // if (usePhysics)
             // {
             //     _physicsTransformAccessArray = new TransformAccessArray(_physicsTransforms.ToArray());
@@ -134,17 +94,6 @@ namespace BinaryEgo.Voxelizer
             _nativeMatrices.CopyFromNBC(_matrices.ToArray());
             _nativeColors.CopyFromNBC(_colors.ToArray());
         }
-
-        // public void CloneCache()
-        // {
-        //     //_vertices = new NativeList<Vector3>(_vertices.Length, Allocator.Persistent);
-        //     //_vertices.AddRangeNoResize(POSITION_CACHE[_cacheName]);
-        //     _colors = new NativeList<Vector4>(_colors.Length, Allocator.Persistent);
-        //     _colors.AddRangeNoResize(COLOR_CACHE[_cacheName]);
-        //     voxelIndices = new NativeList<int>(voxelIndices.Length, Allocator.Persistent);
-        //     voxelIndices.AddRangeNoResize(INDEX_CACHE[_cacheName]);
-        //     _usingCache = false;
-        // }
 
         public void Invalidate(ComputeBuffer p_matrixBuffer, NativeArray<Matrix4x4> p_matrixArray,
             ComputeBuffer p_colorBuffer, NativeArray<Vector4> p_colorArray, int p_index)
@@ -191,7 +140,7 @@ namespace BinaryEgo.Voxelizer
             {
                 previousTransformMatrixI = _previousTransformMatrix.inverse,
                 transformMatrix = transformMatrix,
-                matrices = _nativeMatrices,
+                inOutMatrices = _nativeMatrices,
             };
 
             // if (usePhysics)
@@ -218,46 +167,124 @@ namespace BinaryEgo.Voxelizer
             p_colorBuffer.SetData(_nativeColors.AsArray(), 0, p_index, _nativeIndices.Length);
         }
 
-        // public void Erase(Vector3 p_point, float p_radius)
-        // {
-        //     Paint(p_point, p_radius, new Color(0,0,0,0));
-        // }
+        public Vector3 GetVoxelPosition(int p_index)
+        {
+            if (!_nativeMatrices.IsCreated || _nativeMatrices.Length <= p_index)
+                return Vector3.zero;
+            
+            return _nativeMatrices[p_index].GetPosition();
+        }
+        
+        public Color GetVoxelColor(int p_index)
+        {
+            if (!_nativeColors.IsCreated || _nativeColors.Length <= p_index)
+                return Color.white;
+            
+            return _nativeColors[p_index];
+        }
 
-        // public void Hit(Vector3 p_point, float p_radius)
-        // {
-        //     // if (_usingCache)
-        //     //     CloneCache();
-        //     
-        //     // for (int i = 0; i<_matrices.Length; i++)
-        //     // {
-        //     //     if (Vector3.Distance(_matrices[i].GetColumn(3), p_point) < p_radius)
-        //     //     {
-        //     //         _physicsTransforms[i].GetComponent<Rigidbody>().isKinematic = false;
-        //     //     }
-        //     // }
-        // }
+        // Very slow implementation using bruteforce jobs, refactor to something like octree later
+        public bool Hit(Ray p_ray, out int p_index)
+        {
+            p_index = -1;
+            if (!_nativeMatrices.IsCreated || _nativeMatrices.Length == 0)
+                return false;
+            
+            NativeArray<int> outputIndex = new NativeArray<int>(1, Allocator.TempJob);
+            outputIndex[0] = -1;
 
-        // public void Paint(Vector3 p_point, float p_radius, Color p_color)
-        // {
-        //     // if (_usingCache)
-        //     //     CloneCache();
-        //     
-        //     for (int i = 0; i<_nativeMatrices.Length; i++)
-        //     {
-        //         if (Vector3.Distance(_nativeMatrices[i].GetColumn(3), p_point) < p_radius)
-        //         {
-        //             _nativeColors[i] = p_color;
-        //         }
-        //     }
-        //     
-        //     _transform.hasChanged = true;
-        // }
+            VoxelRaycastJob voxelRaycastJob = new VoxelRaycastJob()
+            {
+                ray = p_ray,
+                // Bounding sphere
+                voxelSize = Mathf.Sqrt(2*_voxelSize*_voxelSize),
+                inMatrices = _nativeMatrices,
+                
+                outputIndex = outputIndex,
+            };
+            JobHandle jobHandle = voxelRaycastJob.Schedule();
+            jobHandle.Complete();
+
+            bool hit = outputIndex[0] >= 0;
+            if (hit)
+            {
+                p_index = outputIndex[0];
+            }
+            
+            outputIndex.Dispose();
+            
+            return hit;
+        }
+        
+        public void Paint(Vector3 p_point, float p_radius, Color p_color)
+        {
+            if (!_nativeMatrices.IsCreated || _nativeMatrices.Length == 0)
+                return;
+
+            var hitList = new NativeList<int>(Allocator.TempJob);
+            VoxelDistanceJob voxelDistanceJob = new VoxelDistanceJob()
+            {
+                point = p_point,
+                radius = p_radius,
+                inMatrices = _nativeMatrices,
+            };
+            JobHandle jobHandle = voxelDistanceJob.ScheduleAppend(hitList, _nativeIndices.Length, 100);
+            jobHandle.Complete();
+
+            for (int i = 0; i < hitList.Length; i++)
+            {
+                _nativeColors[hitList[i]] = p_color;
+            }
+            
+            hitList.Dispose();
+        }
+
+        private int[] highlightedIndices;
+        private Color[] highlightedColors;
+        public void Unhighlight()
+        {
+            if (!_nativeColors.IsCreated || highlightedIndices == null)
+                return;
+            
+            for (int i = 0; i < highlightedIndices.Length; i++)
+            {
+                _nativeColors[highlightedIndices[i]] = highlightedColors[i];
+            }
+
+            highlightedIndices = null;
+        }
+        public void Highlight(Vector3 p_point, float p_radius, Color p_color)
+        {
+            if (!_nativeMatrices.IsCreated || _nativeMatrices.Length == 0)
+                return;
+
+            var hitList = new NativeList<int>(Allocator.TempJob);
+            VoxelDistanceJob voxelDistanceJob = new VoxelDistanceJob()
+            {
+                point = p_point,
+                radius = p_radius,
+                inMatrices = _nativeMatrices,
+            };
+            JobHandle jobHandle = voxelDistanceJob.ScheduleAppend(hitList, _nativeIndices.Length, 100);
+            jobHandle.Complete();
+
+            highlightedIndices = hitList.ToArray();
+            highlightedColors = new Color[highlightedIndices.Length];
+            
+
+            for (int i = 0; i < highlightedIndices.Length; i++)
+            {
+                highlightedColors[i] = _nativeColors[highlightedIndices[i]];
+                _nativeColors[highlightedIndices[i]] = p_color;
+            }
+            
+            hitList.Dispose();
+        }
 
         public void Dispose()
         {
             _forceInvalidateJobs = true;
             _previousTransformMatrix = Matrix4x4.identity;
-            //if (!_usingCache && _matrices.IsCreated)
             if (_nativeMatrices.IsCreated)
             {
                 _nativeColors.Dispose();
@@ -267,33 +294,6 @@ namespace BinaryEgo.Voxelizer
                 _nativeMatrices.Dispose();
                 _nativeMatrices = default;
             }
-            // else
-            // {
-            //     // Warning I assume here that this dispose will be called when application exits/stopsplaying otherwise you shouldn't dispose cache :)
-            //     if (!_cacheDisposed)
-            //     {
-            //         foreach (var key in POSITION_CACHE.Keys.ToArray())
-            //         {
-            //             if (POSITION_CACHE[key].IsCreated)
-            //             {
-            //                 POSITION_CACHE[key].Dispose();
-            //                 POSITION_CACHE[key] = default;
-            //             }
-            //
-            //             if (COLOR_CACHE[key].IsCreated) 
-            //             {
-            //                 COLOR_CACHE[key].Dispose();
-            //                 COLOR_CACHE[key] = default;
-            //             }
-            //
-            //             if (INDEX_CACHE[key].IsCreated) 
-            //             {
-            //                 INDEX_CACHE[key].Dispose();
-            //                 INDEX_CACHE[key] = default;
-            //             }
-            //         }
-            //     }
-            // }
 
             // if (usePhysics)
             // {
@@ -302,16 +302,16 @@ namespace BinaryEgo.Voxelizer
         }
 
 
-        [BurstCompile]
-        struct PhysicsUpdateJob : IJobParallelForTransform
-        {
-            public NativeSlice<Matrix4x4> matrices;
-
-            public void Execute(int p_index, TransformAccess transform)
-            {
-                matrices[p_index] = transform.localToWorldMatrix;
-            }
-        }
+        // [BurstCompile]
+        // struct PhysicsUpdateJob : IJobParallelForTransform
+        // {
+        //     public NativeSlice<Matrix4x4> matrices;
+        //
+        //     public void Execute(int p_index, TransformAccess transform)
+        //     {
+        //         matrices[p_index] = transform.localToWorldMatrix;
+        //     }
+        // }
 
         #region SERIALIZATION
 
