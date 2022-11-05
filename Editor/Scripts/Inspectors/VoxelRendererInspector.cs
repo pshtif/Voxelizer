@@ -2,7 +2,6 @@
  *	Created by:  Peter @sHTiF Stefcek
  */
 
-using Plugins.Voxelizer.Editor.Scripts;
 using UnityEditor;
 using UnityEngine;
 
@@ -12,11 +11,12 @@ namespace BinaryEgo.Voxelizer.Editor
     public class VoxelRendererInspector : UnityEditor.Editor
     {
         public static GUISkin Skin => (GUISkin)Resources.Load("Skins/VoxelizerEditorSkin");
+        
+        public VoxelRenderer voxelRenderer => (target as VoxelRenderer);
 
         public override void OnInspectorGUI()
         {
-            var voxelRenderer = (target as VoxelRenderer);
-            
+
             GUILayout.Label("<color=#FF8800>VOXEL RENDERER</color>", Skin.GetStyle("editor_title"), GUILayout.Height(24));
             GUILayout.Label("VERSION "+Voxelizer.VERSION, Skin.GetStyle("editor_version"), GUILayout.Height(16));
             GUILayout.Space(4);
@@ -24,36 +24,18 @@ namespace BinaryEgo.Voxelizer.Editor
             EditorGUI.BeginChangeCheck();
 
             DrawRenderSection();
-
-            // voxelizer.autoVoxelize = EditorGUILayout.Toggle("Auto Voxelize", voxelizer.autoVoxelize);
-            //
-            // voxelizer.voxelizationType =
-            //     (VoxelizationType)EditorGUILayout.EnumPopup("Voxelization", voxelizer.voxelizationType);
-            //
-            // voxelizer.voxelDensityType = (VoxelDensityType)EditorGUILayout.EnumPopup("Density Type", voxelizer.voxelDensityType);
-            // voxelizer.voxelDensity = EditorGUILayout.IntSlider("Voxel Density", voxelizer.voxelDensity, 1, 100);
-            //
-            // voxelizer.generateMesh = EditorGUILayout.Toggle("Generate Unity Mesh", voxelizer.generateMesh);
-            //
-            // if (EditorGUI.EndChangeCheck())
-            // {
-            //     if (voxelizer.autoVoxelize)
-            //     {
-            //         voxelizer.Voxelize();
-            //         SceneView.lastActiveSceneView?.Repaint();
-            //     }
-            // }
-            //
-            // if (GUILayout.Button("Voxelize", GUILayout.Height(32)))
-            // {
-            //     voxelizer.Voxelize();
-            // }
+            
+            GUILayout.Space(2);
+            
+            DrawEditorSection();
+            
+            GUILayout.Space(2);
+            
+            DrawMeshesSection();
         }
 
         public void DrawRenderSection()
         {
-            var voxelRenderer = (target as VoxelRenderer);
-
             if (!GUIUtils.DrawMinimizableSectionTitle("RENDER SETTINGS", ref voxelRenderer.renderSectionMinimized))
                 return;
             
@@ -102,6 +84,42 @@ namespace BinaryEgo.Voxelizer.Editor
                 {
                     EditorGUILayout.HelpBox("Material does not support culling.", MessageType.Warning);
                 }
+            }
+        }
+
+        public void DrawEditorSection()
+        {
+            if (!GUIUtils.DrawMinimizableSectionTitle("EDITING SETTINGS", ref voxelRenderer.editorSectionMinimized))
+                return;
+            
+            voxelRenderer.enablePainting = EditorGUILayout.Toggle("Enable Painting", voxelRenderer.enablePainting);
+            voxelRenderer.brushColor = EditorGUILayout.ColorField("Brush Color", voxelRenderer.brushColor);
+            voxelRenderer.brushSize = EditorGUILayout.Slider("Brush Size", voxelRenderer.brushSize, 0.01f, 1f);
+        }
+        
+        public void DrawMeshesSection()
+        {
+            if (!GUIUtils.DrawMinimizableSectionTitle("VOXEL MESHES", ref voxelRenderer.meshesSectionMinimized))
+                return;
+
+            foreach (var voxelGroup in voxelRenderer.VoxelGroups)
+            {
+                foreach (var voxelMesh in voxelGroup.VoxelMeshes)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label(voxelMesh.name);
+                    GUILayout.FlexibleSpace();
+                    GUI.color = Color.yellow;
+                    GUILayout.Label(voxelMesh.VoxelCount.ToString());
+                    GUI.color = Color.white;
+                    GUILayout.EndHorizontal();
+                }
+            }
+            
+            if (GUIUtils.DrawButton("CLEAR ALL"))
+            {
+                voxelRenderer.ClearVoxelGroups();
+                EditorUtility.SetDirty(voxelRenderer);
             }
         }
     }
