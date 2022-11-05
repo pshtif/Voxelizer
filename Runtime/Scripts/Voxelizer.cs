@@ -60,7 +60,8 @@ namespace BinaryEgo.Voxelizer
             OnProgress("Voxelizer", "Voxelization initialized", 0);
 
             MeshRenderer[] meshRenderers = sourceTransform.GetComponentsInChildren<MeshRenderer>();
-            
+            SkinnedMeshRenderer[] skinnedMeshRenderers = sourceTransform.GetComponentsInChildren<SkinnedMeshRenderer>();
+
             for (int i = 0; i<meshRenderers.Length; i++)
             {
                 MeshRenderer meshRenderer = meshRenderers[i];
@@ -68,29 +69,64 @@ namespace BinaryEgo.Voxelizer
                 if (sourceLayerMask != (sourceLayerMask | (1 << meshRenderer.gameObject.layer)))
                     continue;
                 
-                OnProgress("Voxelizer", "Voxelizing " + meshRenderer.name, (i+1)/(meshRenderers.Length+1));
-                VoxelizeMesh(meshRenderer);
+                OnProgress("Voxelizer", "Voxelizing " + meshRenderer.name, (i+1)/(meshRenderers.Length+skinnedMeshRenderers.Length+1));
+                VoxelizeMeshRenderer(meshRenderer);
             }
             
+            for (int i = 0; i<skinnedMeshRenderers.Length; i++)
+            {
+                SkinnedMeshRenderer skinnedMeshRenderer = skinnedMeshRenderers[i];
+                
+                if (sourceLayerMask != (sourceLayerMask | (1 << skinnedMeshRenderer.gameObject.layer)))
+                    continue;
+                
+                OnProgress("Voxelizer", "Voxelizing " + skinnedMeshRenderer.name, (meshRenderers.Length+i+1)/(meshRenderers.Length+skinnedMeshRenderers.Length+1));
+                VoxelizeSkinnedMeshRenderer(skinnedMeshRenderer);
+            }
+
             OnComplete();
         }
 
-        public void VoxelizeMesh(MeshRenderer p_meshRenderer)
+        public void VoxelizeMeshRenderer(MeshRenderer p_meshRenderer)
         {
             MeshFilter filter = p_meshRenderer.GetComponent<MeshFilter>();
             
             if (filter == null)
                 return;
 
+            VoxelMesh voxelMesh = VoxelizeMesh(filter.sharedMesh, p_meshRenderer.sharedMaterials.ToArray(), p_meshRenderer.transform);
+
+            if (voxelMesh != null)
+            {
+                VoxelRenderer.Instance.Add(voxelMesh);
+            }
+        }
+        
+        public void VoxelizeSkinnedMeshRenderer(SkinnedMeshRenderer p_skinnedMeshRenderer)
+        {
+            if (p_skinnedMeshRenderer.sharedMesh == null)
+                return;
+
+            VoxelMesh voxelMesh = VoxelizeMesh(p_skinnedMeshRenderer.sharedMesh, p_skinnedMeshRenderer.sharedMaterials.ToArray(), p_skinnedMeshRenderer.transform);
+
+            if (voxelMesh != null)
+            {
+                VoxelRenderer.Instance.Add(voxelMesh);
+            }
+        }
+
+        public VoxelMesh VoxelizeMesh(Mesh p_mesh, Material[] p_materials, Transform p_transform)
+        {
+
             Mesh mesh;
             if (voxelTransformBakeType == VoxelTransformBakeType.NONE)
             {
-                mesh = filter.sharedMesh;
+                mesh = p_mesh;
             }
             else
             {
-                mesh = Instantiate(filter.sharedMesh);
-                var matrix = p_meshRenderer.transform.localToWorldMatrix;
+                mesh = Instantiate(p_mesh);
+                var matrix = p_transform.localToWorldMatrix;
                 switch (voxelTransformBakeType)
                 {
                     case VoxelTransformBakeType.SCALE_ROTATION:
@@ -108,8 +144,6 @@ namespace BinaryEgo.Voxelizer
                 }
                 mesh.vertices = vertices;
             }
-            
-            Material[] materials = p_meshRenderer.sharedMaterials.ToArray();
 
             DMesh3 dmesh = Geome3Utils.UnityMeshToDMesh(mesh, false);
             dmesh.name = mesh.name;
@@ -144,7 +178,7 @@ namespace BinaryEgo.Voxelizer
                 Mathf.FloorToInt((float)dmesh.CachedBounds.Depth / voxelSize));
             
             if (voxelSize == 0)
-                return;
+                return null;
             
             DMeshAABBTree3 spatial = new DMeshAABBTree3(dmesh, autoBuild: true);
             ShiftGridIndexer3 indexer = new ShiftGridIndexer3(dmesh.CachedBounds.Min, voxelSize);
@@ -197,7 +231,7 @@ namespace BinaryEgo.Voxelizer
                 if (!enableVoxelCache || dmesh.name.IsNullOrWhitespace() || _voxelColorCache == null ||
                     !_voxelColorCache.ContainsKey(dmesh.name))
                 {
-                    color = GenerateColorBuffer(bitmap, voxelOffset, dmesh, indexer, spatial, materials,
+                    color = GenerateColorBuffer(bitmap, voxelOffset, dmesh, indexer, spatial, p_materials,
                         interpolateColorSampling);
 
                     if (enableVoxelCache && !dmesh.name.IsNullOrWhitespace())
@@ -220,13 +254,10 @@ namespace BinaryEgo.Voxelizer
                 color = Enumerable.Repeat(Vector4.one, bitmap.NonZeros().Count()).ToArray();
             }
 
-            var voxelMesh = new VoxelMesh(bitmap, color, p_meshRenderer.transform, dmesh.CachedBounds, finalOffset, false, voxelSize, voxelTransformBakeType);
-            VoxelRenderer.Instance.Add(voxelMesh);
-
             if (generateMesh)
             {
                 DMesh3 outputMesh = GenerateVoxelMesh(bitmap, voxelSize, voxelOffset, enableColorSampling, dmesh, indexer,
-                    spatial, interpolateColorSampling, materials);
+                    spatial, interpolateColorSampling, p_materials);
                 MeshTransforms.Translate(outputMesh, new Vector3(
                     (float)dmesh.CachedBounds.Min.x,
                     (float)dmesh.CachedBounds.Min.y,
@@ -234,10 +265,13 @@ namespace BinaryEgo.Voxelizer
 
 
                 var go = new GameObject("VoxelizedMesh");
-                go.transform.parent = p_meshRenderer.transform;
+                go.transform.parent = p_transform;
                 var outputFilter = go.AddComponent<MeshFilter>();
                 outputFilter.sharedMesh = Geome3Utils.DMeshToUnityMesh(outputMesh);
             }
+
+            return new VoxelMesh(dmesh.name, bitmap, color, p_transform, dmesh.CachedBounds, finalOffset, false,
+                voxelSize, voxelTransformBakeType);
         }
 
         public DMesh3 GenerateVoxelMesh(Bitmap3 p_bitmap, double p_voxelSize, Vector3d p_voxelOffset,
