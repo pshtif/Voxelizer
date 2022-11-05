@@ -13,7 +13,8 @@ namespace BinaryEgo.Voxelizer
     {
 #if UNITY_EDITOR
         public bool renderSectionMinimized = false;
-        public bool materialSectionMinimized = false;
+        public bool editorSectionMinimized = false;
+        public bool meshesSectionMinimized = false;
 #endif
 
         static public VoxelRenderer Instance { get; private set; }
@@ -43,9 +44,15 @@ namespace BinaryEgo.Voxelizer
         public bool enableCulling;
         public float voxelScale = 1;
 
-        [NonSerialized] private bool _initialized = false;
+        [NonSerialized]
+        private bool _initialized;
 
-        [SerializeField] private List<VoxelGroup> _voxelGroups = new List<VoxelGroup>();
+        [SerializeField] 
+        private VoxelGroup _defaultVoxelGroup = new VoxelGroup();
+        [SerializeField]
+        private List<VoxelGroup> _voxelGroups = new List<VoxelGroup>();
+
+        public List<VoxelGroup> VoxelGroups => _voxelGroups;
 
         public int voxelCacheSize = 1000000;
 
@@ -59,8 +66,17 @@ namespace BinaryEgo.Voxelizer
         private VoxelMeshType _previousVoxelMeshType = VoxelMeshType.CUBE;
         public Mesh customVoxelMesh;
 
-        private NativeArray<Matrix4x4> _matrixArray;
+        // Will be separated later
+        #region EDITING
 
+        public bool enablePainting = false;
+        public Color brushColor = Color.white;
+        [Range(.01f,1f)]
+        public float brushSize = 1;
+
+        #endregion
+
+        private NativeArray<Matrix4x4> _matrixArray;
         private NativeArray<Vector4> _colorArray;
         //private NativeArray<Matrix4x4> _zeroMatrixArray;
 
@@ -220,10 +236,8 @@ namespace BinaryEgo.Voxelizer
                 return;
 
             int index = 0;
-            foreach (VoxelGroup voxelGroup in _voxelGroups)
-            {
-                voxelGroup.Invalidate(_matrixBuffer, _matrixArray, _colorBuffer, _colorArray, ref index);
-            }
+            _voxelGroups?.ForEach(
+                vg => vg.Invalidate(_matrixBuffer, _matrixArray, _colorBuffer, _colorArray, ref index));
 
             if (index == 0)
                 return;
@@ -456,11 +470,17 @@ namespace BinaryEgo.Voxelizer
 
             if (p_group == null)
             {
-                p_group = new VoxelGroup();
+                _defaultVoxelGroup.AddMesh(p_mesh);
+                if (!_voxelGroups.Contains(_defaultVoxelGroup))
+                {
+                    _voxelGroups.Add(_defaultVoxelGroup);
+                }
             }
-
-            p_group.AddMesh(p_mesh);
-            _voxelGroups.Add(p_group);
+            else
+            {
+                p_group.AddMesh(p_mesh);
+                _voxelGroups.Add(p_group);
+            }
         }
 
         private void Dispose()
@@ -487,6 +507,13 @@ namespace BinaryEgo.Voxelizer
             _initialized = false;
         }
 
+        public void ClearVoxelGroups()
+        {
+            _voxelGroups?.ForEach(vg => vg.Dispose());
+            _defaultVoxelGroup.ClearMeshes();
+            _voxelGroups.Clear();
+        }
+        
         private void OnDestroy()
         {
             Dispose();
@@ -510,7 +537,79 @@ namespace BinaryEgo.Voxelizer
             var prefabStage = UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage();
             if (prefabStage == null || prefabStage.IsPartOfPrefabContents(this.gameObject))
             {
+                HandleEditing();
+
                 Render(p_sceneView.camera);
+            }
+        }
+
+        private int paitingType = 0;
+        void HandleEditing()
+        {
+            if (enablePainting && !Event.current.alt)
+            {
+                Tools.current = Tool.None;
+                HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
+                
+                if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
+                {
+                    paitingType = 1;
+                }
+
+                if (Event.current.type == EventType.MouseUp)
+                {
+                    paitingType = 0;
+                }
+
+                if (Event.current.type == EventType.MouseDown && Event.current.control)
+                {
+                    paitingType = 2;
+                    Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+                    _voxelGroups?.ForEach(vg =>
+                    {
+                        int index;
+                        VoxelMesh voxelMesh;
+                        if (vg.Hit(ray, out voxelMesh, out index))
+                        {
+                            brushColor = voxelMesh.GetVoxelColor(index);
+                        }
+                    });
+                }
+
+                if (Event.current.isMouse)
+                {
+                    _voxelGroups?.ForEach(vg => vg.Unhighlight());
+                }
+                
+                if (Event.current.type == EventType.MouseMove)
+                {
+                    Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+                    _voxelGroups?.ForEach(vg =>
+                    {
+                        int index;
+                        VoxelMesh voxelMesh;
+                        if (vg.Hit(ray, out voxelMesh, out index))
+                        {
+                            var position = voxelMesh.GetVoxelPosition(index);
+                            voxelMesh.Highlight(position, brushSize, Color.green);
+                        }
+                    });
+                }
+
+                if (paitingType == 1)
+                {
+                    Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+                    _voxelGroups?.ForEach(vg =>
+                    {
+                        int index;
+                        VoxelMesh voxelMesh;
+                        if (vg.Hit(ray, out voxelMesh, out index))
+                        {
+                            var position = voxelMesh.GetVoxelPosition(index);
+                            voxelMesh.Paint(position, brushSize, brushColor);
+                        }
+                    });
+                }
             }
         }
 #endif
